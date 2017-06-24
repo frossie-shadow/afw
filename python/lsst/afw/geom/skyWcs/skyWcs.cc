@@ -72,6 +72,7 @@ PYBIND11_PLUGIN(skyWcs) {
     cls.def("getCdMatrix", (Eigen::Matrix2d(SkyWcs::*)(Point2D const &) const) & SkyWcs::getCdMatrix,
             "pixel"_a);
     cls.def("getCdMatrix", (Eigen::Matrix2d(SkyWcs::*)() const) & SkyWcs::getCdMatrix);
+    cls.def("getTanWcs", &SkyWcs::getTanWcs, "pixel"_a);
     cls.def("copyAtShiftedPixelOrigin", &SkyWcs::copyAtShiftedPixelOrigin, "shift"_a);
     cls.def("pixelToSky", (std::pair<Angle, Angle>(SkyWcs::*)(double, double) const) & SkyWcs::pixelToSky,
             "x"_a, "y"_a);

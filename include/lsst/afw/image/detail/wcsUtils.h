@@ -1,3 +1,5 @@
+// -*- LSST-C++ -*-
+
 /*
  * LSST Data Management System
  * Copyright 2008, 2009, 2010 LSST Corporation.
@@ -20,28 +22,28 @@
  * see <http://www.lsstcorp.org/LegalNotices/>.
  */
 
-/*
- * Definitions to write a FITS image
- */
-#if !defined(SIMPLE_FITS_H)
-#define SIMPLE_FITS_H 1
+#ifndef LSST_AFW_IMAGE_DETAILS_WCSUTILS_H
+#define LSST_AFW_IMAGE_DETAILS_WCSUTILS_H
 
-#include "lsst/afw/image/Image.h"
-#include "lsst/afw/image/Mask.h"
-#include "lsst/afw/image/Wcs.h"
+#include <memory>
+#include <string>
+
+#include "lsst/daf/base.h"
 
 namespace lsst {
 namespace afw {
-namespace display {
+namespace image {
+namespace detail {
 
-template <typename ImageT>
-void writeBasicFits(int fd, ImageT const& data, lsst::afw::geom::SkyWcs const* Wcs = NULL,
-                    char const* title = NULL);
+std::shared_ptr<lsst::daf::base::PropertyList> createTrivialWcsAsPropertySet(std::string const& wcsName,
+                                                                             int const x0 = 0,
+                                                                             int const y0 = 0);
 
-template <typename ImageT>
-void writeBasicFits(std::string const& filename, ImageT const& data, lsst::afw::geom::SkyWcs const* Wcs = NULL,
-                    const char* title = NULL);
-}
-}
-}  // namespace lsst::afw::display
-#endif
+geom::Point2I getImageXY0FromMetadata(std::string const& wcsName, lsst::daf::base::PropertySet* metadata);
+
+}  // namespace detail
+}  // namespace image
+}  // namespace afw
+}  // namespace lsst
+
+#endif  // LSST_AFW_IMAGE_DETAILS_WCSUTILS_H

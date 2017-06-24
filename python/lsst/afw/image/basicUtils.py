@@ -68,8 +68,8 @@ def _compareWcsOverBBox(wcs0, wcs1, bbox, maxDiffSky=0.01*afwGeom.arcseconds,
                         maxDiffPix=0.01, nx=5, ny=5, doShortCircuit=True):
     """!Compare two WCS over a rectangular grid of pixel positions
 
-    @param[in] wcs0  WCS 0 (an lsst.afw.image.Wcs)
-    @param[in] wcs1  WCS 1 (an lsst.afw.image.Wcs)
+    @param[in] wcs0  WCS 0 (an lsst.afw.geom.SkyWcs)
+    @param[in] wcs1  WCS 1 (an lsst.afw.geom.SkyWcs)
     @param[in] bbox  boundaries of pixel grid over which to compare the WCSs (an lsst.afw.geom.Box2I or Box2D)
     @param[in] maxDiffSky  maximum separation between sky positions computed using Wcs.pixelToSky
         (an lsst.afw.geom.Angle)
@@ -103,7 +103,7 @@ def _compareWcsOverBBox(wcs0, wcs1, bbox, maxDiffSky=0.01*afwGeom.arcseconds,
         fromPixPos = afwGeom.Point2D(x, y)
         sky0 = wcs0.pixelToSky(fromPixPos)
         sky1 = wcs1.pixelToSky(fromPixPos)
-        diffSky = sky0.angularSeparation(sky1)
+        diffSky = sky0.separation(sky1)
         if diffSky > measDiffSky[0]:
             measDiffSky = (diffSky, fromPixPos)
             if doShortCircuit:
@@ -132,8 +132,8 @@ def wcsAlmostEqualOverBBox(wcs0, wcs1, bbox, maxDiffSky=0.01*afwGeom.arcseconds,
                            maxDiffPix=0.01, nx=5, ny=5):
     """!Return True if two WCS are almost equal over a grid of pixel positions, else False
 
-    @param[in] wcs0  WCS 0 (an lsst.afw.image.Wcs)
-    @param[in] wcs1  WCS 1 (an lsst.afw.image.Wcs)
+    @param[in] wcs0  WCS 0 (an lsst.afw.geom.SkyWcs)
+    @param[in] wcs1  WCS 1 (an lsst.afw.geom.SkyWcs)
     @param[in] bbox  boundaries of pixel grid over which to compare the WCSs (an lsst.afw.geom.Box2I or Box2D)
     @param[in] maxDiffSky  maximum separation between sky positions computed using Wcs.pixelToSky
         (an lsst.afw.geom.Angle)
@@ -165,8 +165,8 @@ def assertWcsAlmostEqualOverBBox(testCase, wcs0, wcs1, bbox, maxDiffSky=0.01*afw
 
     @param[in] testCase  unittest.TestCase instance the test is part of;
                         an object supporting one method: fail(self, msgStr)
-    @param[in] wcs0  WCS 0 (an lsst.afw.image.Wcs)
-    @param[in] wcs1  WCS 1 (an lsst.afw.image.Wcs)
+    @param[in] wcs0  WCS 0 (an lsst.afw.geom.SkyWcs)
+    @param[in] wcs1  WCS 1 (an lsst.afw.geom.SkyWcs)
     @param[in] bbox  boundaries of pixel grid over which to compare the WCSs (an lsst.afw.geom.Box2I or Box2D)
     @param[in] maxDiffSky  maximum separation between sky positions computed using Wcs.pixelToSky
         (an lsst.afw.geom.Angle)

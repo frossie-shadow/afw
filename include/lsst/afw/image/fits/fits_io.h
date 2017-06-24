@@ -30,7 +30,7 @@
 #include "lsst/pex/exceptions.h"
 #include "lsst/afw/fits.h"
 #include "lsst/afw/geom.h"
-#include "lsst/afw/image/Wcs.h"
+#include "lsst/afw/image/detail/wcsUtils.h"
 #include "ndarray.h"
 
 namespace lsst {
