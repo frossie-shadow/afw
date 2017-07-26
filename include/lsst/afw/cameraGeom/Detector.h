@@ -63,6 +63,8 @@ enum DetectorType {
  */
 class Detector {
 public:
+    typedef ndarray::Array<float const, 2> CrosstalkMatrix;
+
     /**
      * Make a Detector
      *
@@ -83,9 +85,10 @@ public:
             lsst::afw::table::AmpInfoCatalog const &ampInfoCatalog,  ///< catalog of amplifier information
             Orientation const &orientation,   ///< detector position and orientation in focal plane
             geom::Extent2D const &pixelSize,  ///< pixel size (mm)
-            CameraTransformMap::Transforms const &transforms  ///< map of
+            CameraTransformMap::Transforms const &transforms,  ///< map of
             ///< CameraSys: lsst::afw::geom::XYTransform, where each transform's "forwardTransform" method
             ///< transforms from PIXELS to the specified camera system
+            CrosstalkMatrix const &crosstalk=CrosstalkMatrix() ///< matrix of crosstalk coefficients
             );
 
     ~Detector() {}
@@ -127,6 +130,14 @@ public:
 
     /** Get the transform registry */
     CameraTransformMap const getTransformMap() const { return _transformMap; }
+
+    /** Have we got crosstalk coefficients? */
+    bool hasCrosstalk() const {
+        return !(_crosstalk.isEmpty() || _crosstalk.getShape() == ndarray::makeVector(0, 0));
+    }
+
+    /** Get the crosstalk coefficients */
+    CrosstalkMatrix const getCrosstalk() const { return _crosstalk; }
 
     /** Get iterator to beginning of amplifier list */
     lsst::afw::table::AmpInfoCatalog::const_iterator begin() const { return _ampInfoCatalog.begin(); }
@@ -301,6 +312,7 @@ private:
     Orientation _orientation;               ///< position and orientation of detector in focal plane
     geom::Extent2D _pixelSize;              ///< pixel size (mm)
     CameraTransformMap _transformMap;       ///< registry of coordinate transforms
+    CrosstalkMatrix _crosstalk;             ///< crosstalk coefficients
 };
 }  // namespace cameraGeom
 }  // namespace afw

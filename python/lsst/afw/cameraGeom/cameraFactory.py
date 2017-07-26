@@ -42,7 +42,7 @@ def makeDetector(detectorConfig, ampInfoCatalog, focalPlaneToPupil):
         pixelSizeMm = pixelSizeMm,
     )
 
-    return Detector(
+    args = [
         detectorConfig.name,
         detectorConfig.id,
         DetectorType(detectorConfig.detectorType),
@@ -52,7 +52,11 @@ def makeDetector(detectorConfig, ampInfoCatalog, focalPlaneToPupil):
         orientation,
         pixelSizeMm,
         transforms,
-    )
+    ]
+    crosstalk = detectorConfig.getCrosstalk(len(ampInfoCatalog))
+    if crosstalk:
+        args.append(crosstalk)
+    return Detector(*args)
 
 
 def copyDetector(detector, ampInfoCatalog=None):
@@ -75,7 +79,7 @@ def copyDetector(detector, ampInfoCatalog=None):
     return Detector(detector.getName(), detector.getId(), detector.getType(),
                     detector.getSerial(), detector.getBBox(),
                     ampInfoCatalog, detector.getOrientation(), detector.getPixelSize(),
-                    transformDict)
+                    transformDict, detector.getCrosstalk())
 
 
 def makeOrientation(detectorConfig):
