@@ -97,14 +97,23 @@ inline void fits_read_array(fits::Fits& fitsfile, ndarray::Array<PixelT, 2, 2>& 
 
 template <typename ImageT>
 inline void fits_write_image(fits::Fits& fitsfile, const ImageT& image,
+                             fits::ImageWriteOptions const& options,
                              std::shared_ptr<daf::base::PropertySet const> metadata =
                                      std::shared_ptr<daf::base::PropertySet const>()) {
+#if 0
     fitsfile.createImage<typename ImageT::Pixel>(image.getArray().getShape());
     if (metadata) {
         fitsfile.writeMetadata(*metadata);
     }
     fitsfile.writeImage(image.getArray());
+#else
+    std::shared_ptr<daf::base::PropertyList const> header =
+        std::static_pointer_cast<daf::base::PropertyList const>(metadata);
+    fitsfile.writeImage(image.getArray(), header ? header : std::make_shared<daf::base::PropertyList const>(),
+                        options);
+#endif
 }
+
 }
 }
 }  // namespace lsst::afw::image

@@ -20,6 +20,7 @@ extern "C" {
 #include "lsst/log/Log.h"
 #include "lsst/afw/fits.h"
 #include "lsst/afw/geom/Angle.h"
+#include "lsst/afw/fitsCompression.h"
 
 namespace lsst {
 namespace afw {
@@ -896,8 +897,9 @@ void Fits::createEmpty() {
 }
 
 template <typename T>
-void Fits::createImageImpl(int naxis, long *naxes) {
-    fits_create_img(reinterpret_cast<fitsfile *>(fptr), FitsBitPix<T>::CONSTANT, naxis, naxes, &status);
+void Fits::createImageImpl(int naxis, long const *naxes) {
+    fits_create_img(reinterpret_cast<fitsfile *>(fptr), FitsBitPix<T>::CONSTANT, naxis,
+                    const_cast<long*>(naxes), &status);
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Creating new image HDU");
     }
@@ -911,6 +913,49 @@ void Fits::writeImageImpl(T const *data, int nElements) {
         LSST_FITS_CHECK_STATUS(*this, "Writing image");
     }
 }
+
+template <typename T>
+void Fits::writeImageImpl(
+    T const* array,
+    int nDims,
+    long const* dims,
+    std::shared_ptr<daf::base::PropertyList const> header,
+    ImageWriteOptions const& options)
+{
+    auto fits = reinterpret_cast<fitsfile *>(fptr);
+#if 1
+    ImageCompressionContext comp(*this, nDims, options.compression);  // RAII
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Activating compression for write image");
+    }
+#endif
+
+    // We need a place to put the image+header, and CFITSIO needs to know the dimenions.
+    createImageImpl<T>(nDims, dims);
+
+    writeMetadata(*header);
+
+    // XXX custom scaling of image goes here
+
+    long numPixels = 1;
+    for (int ii = 0; ii < nDims; ++ii) numPixels *= dims[ii];
+//    if (nDims == 0 || numPixels == 0) return;
+
+    // Write the pixels
+    fits_write_img(fits, FitsType<T>::CONSTANT, 1, numPixels, const_cast<T *>(array), &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Writing image");
+    }
+
+    // cfitsio says this is deprecated, but Pan-STARRS found that it was sometimes necessary:
+    // "This forces a re-scan of the header to ensure everything's kosher.
+    // Without this, compressed HDUs have been written out with PCOUNT=0 and TFORM1 not correctly set."
+    fits_set_hdustruc(fits, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Finalizing header");
+    }
+}
+
 
 template <typename T>
 void Fits::readImageImpl(int nAxis, T *data, long *begin, long *end, long *increment) {
@@ -937,6 +982,54 @@ bool Fits::checkImageType() {
     fits_get_img_equivtype(reinterpret_cast<fitsfile *>(fptr), &bitpix, &status);
     if (behavior & AUTO_CHECK) LSST_FITS_CHECK_STATUS(*this, "Getting image type");
     return bitpix == FitsBitPix<T>::CONSTANT;
+}
+
+ImageCompressionOptions Fits::getImageCompression(int nDim)
+{
+    auto fits = reinterpret_cast<fitsfile *>(fptr);
+    int compType = 0;  // cfitsio compression type
+    fits_get_compression_type(fits, &compType, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Getting compression type");
+    }
+
+    ImageCompressionOptions::Tiles tiles = ndarray::allocate(nDim);
+    fits_get_tile_dim(fits, tiles.getNumElements(), tiles.getData(), &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Getting tile dimensions");
+    }
+
+    int noiseBits;
+    fits_get_noise_bits(fits, &noiseBits, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Getting noise bits");
+    }
+
+    return ImageCompressionOptions(compressionSchemeFromCfitsio(compType), tiles, noiseBits);
+}
+
+void Fits::setImageCompression(ImageCompressionOptions const& comp)
+{
+    auto fits = reinterpret_cast<fitsfile *>(fptr);
+    fits_set_compression_type(fits, compressionSchemeToCfitsio(comp.scheme), &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Setting compression type");
+    }
+
+    if (comp.scheme == ImageCompressionOptions::COMPRESS_NONE) {
+        // Nothing else worth doing
+        return;
+    }
+
+    fits_set_tile_dim(fits, comp.tiles.getNumElements(), comp.tiles.getData(), &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Setting tile dimensions");
+    }
+
+    fits_set_quantize_level(fits, comp.quantizeLevel, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Setting quantization level");
+    }
 }
 
 // ---- Manipulating files ----------------------------------------------------------------------------------
@@ -1065,8 +1158,11 @@ std::shared_ptr<daf::base::PropertyList> readMetadata(fits::Fits &fitsfile, bool
     template void Fits::readKey(std::string const &, T &);
 
 #define INSTANTIATE_IMAGE_OPS(r, data, T)                                \
-    template void Fits::createImageImpl<T>(int, long *);                 \
+    template void Fits::createImageImpl<T>(int, long const*);                 \
     template void Fits::writeImageImpl(T const *, int);                  \
+    template void Fits::writeImageImpl(T const *, int, long const *, \
+                                       std::shared_ptr<daf::base::PropertyList const>, \
+                                       ImageWriteOptions const&); \
     template void Fits::readImageImpl(int, T *, long *, long *, long *); \
     template bool Fits::checkImageType<T>();                             \
     template int getBitPix<T>();

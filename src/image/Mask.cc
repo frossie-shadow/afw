@@ -518,7 +518,7 @@ void Mask<MaskPixelT>::writeFits(fits::Fits& fitsfile,
             detail::createTrivialWcsAsPropertySet(detail::wcsNameForXY0, this->getX0(), this->getY0());
     metadata->combine(wcsAMetadata);
 
-    fits_write_image(fitsfile, *this, metadata);
+    fits_write_image(fitsfile, *this, fits::ImageWriteOptions(*this), metadata);
 }
 
 #endif  // !DOXYGEN

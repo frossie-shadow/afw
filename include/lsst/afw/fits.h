@@ -22,6 +22,7 @@
 #include "lsst/pex/exceptions.h"
 #include "lsst/daf/base.h"
 #include "ndarray.h"
+#include "lsst/afw/fitsCompression.h"
 
 namespace lsst {
 namespace afw {
@@ -180,6 +181,26 @@ private:
     bool _managed;
 };
 
+
+
+
+/// Options for writing an image
+struct ImageWriteOptions {
+    ImageCompressionOptions compression;
+    // Additional information:
+    // * Scaling (polymorphic class to implement different styles?)
+    //   + Manual BSCALE, BZERO
+    //   + Options for fuzzing values when quantising
+    //   + How to calculate scaling
+    //   + BITPIX
+
+    template <typename T>
+    ImageWriteOptions(image::Image<T> const& image) : compression(image) {}
+    template <typename T>
+    ImageWriteOptions(image::Mask<T> const& mask) : compression(mask) {}
+};
+
+
 /**
  *  @brief A simple struct that combines the two arguments that must be passed to most cfitsio routines
  *         and contains thin and/or templated wrappers around common cfitsio routines.
@@ -198,9 +219,16 @@ private:
  */
 class Fits {
     template <typename T>
-    void createImageImpl(int nAxis, long* nAxes);
+    void createImageImpl(int nAxis, long const* nAxes);
     template <typename T>
     void writeImageImpl(T const* data, int nElements);
+    template <typename T>
+    void writeImageImpl(
+        T const* data,
+        int nDims,
+        long const* dims,
+        std::shared_ptr<daf::base::PropertyList const> header,
+        ImageWriteOptions const& options);
     template <typename T>
     void readImageImpl(int nAxis, T* data, long* begin, long* end, long* increment);
     void getImageShapeImpl(int maxDim, long* nAxes);
@@ -375,6 +403,16 @@ public:
         writeImageImpl(contiguous.getData(), contiguous.getNumElements());
     }
 
+    template <typename T, int N, int C>
+    void writeImage(ndarray::Array<T const, N, C> const& array,
+                    std::shared_ptr<daf::base::PropertyList const> header,
+                    ImageWriteOptions const& options) {
+        ndarray::Array<T const, N, N> contiguous = ndarray::dynamic_dimension_cast<N>(array);
+        if (contiguous.empty()) contiguous = ndarray::copy(array);
+        ndarray::Vector<long, N> dims(contiguous.getShape().reverse());
+        writeImageImpl(contiguous.getData(), N, dims.elems, header, options);
+    }
+
     /// Return the number of dimensions in the current HDU.
     int getImageDim();
 
@@ -490,6 +528,9 @@ public:
     /// Close a FITS file.
     void closeFile();
 
+    void setImageCompression(ImageCompressionOptions const& options);
+    ImageCompressionOptions getImageCompression(int nDim);
+
     ~Fits() {
         if ((fptr) && (behavior & AUTO_CLOSE)) closeFile();
     }
@@ -541,6 +582,28 @@ std::shared_ptr<daf::base::PropertyList> readMetadata(fits::MemFileManager& mana
  *              (e.g. NAXIS, BITPIX) will be ignored.
  */
 std::shared_ptr<daf::base::PropertyList> readMetadata(fits::Fits& fitsfile, bool strip = false);
+
+
+/// RAII for activating compression
+///
+/// Compression is a global in cfitsio, so we need to set it,
+/// do our stuff and then restore the old settings.
+struct ImageCompressionContext {
+  public:
+    ImageCompressionContext(Fits & fits_, int nDim, ImageCompressionOptions const& useThis)
+        : fits(fits_), old(fits.getImageCompression(nDim)) {
+        fits.setImageCompression(useThis);
+    }
+    ~ImageCompressionContext() {
+        fits.setImageCompression(old);
+    }
+  private:
+    Fits & fits;  // FITS file we're working on
+    ImageCompressionOptions old;  // Former settings, to be restored on destruction
+
+};
+
+
 }
 }
 }  /// namespace lsst::afw::fits

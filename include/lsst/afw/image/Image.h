@@ -64,6 +64,7 @@ class DecoratedImageFormatter;
 namespace fits {
 class Fits;
 class MemFileManager;
+struct ImageWriteOptions;
 }
 
 namespace image {
@@ -657,6 +658,12 @@ public:
      */
     void writeFits(fits::Fits& fitsfile, std::shared_ptr<lsst::daf::base::PropertySet const> metadata =
                                                  std::shared_ptr<lsst::daf::base::PropertySet const>()) const;
+
+    void writeFits(
+        fits::Fits& fitsfile,
+        daf::base::PropertyList const& header,
+        fits::ImageWriteOptions const& options
+    );
 
     /**
      *  Read an Image from a regular FITS file.

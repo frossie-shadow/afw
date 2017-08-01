@@ -415,8 +415,17 @@ void Image<PixelT>::writeFits(fits::Fits& fitsfile,
     } else {
         metadata = wcsAMetadata;
     }
-    fits_write_image(fitsfile, *this, metadata);
+    fits_write_image(fitsfile, *this, fits::ImageWriteOptions(*this), metadata);
 }
+
+template <typename PixelT>
+void Image<PixelT>::writeFits(fits::Fits& fitsfile, daf::base::PropertyList const& header,
+                              fits::ImageWriteOptions const& options)
+{
+
+
+}
+
 
 #endif  // !DOXYGEN
 
