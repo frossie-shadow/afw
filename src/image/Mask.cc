@@ -467,7 +467,9 @@ Mask<MaskPixelT>::Mask(fits::Fits& fitsfile, std::shared_ptr<daf::base::Property
         metadata = std::shared_ptr<daf::base::PropertySet>(new daf::base::PropertyList);
     }
 
+    std::cerr << fitsfile.getHdu() << std::endl;
     fits_read_image<fits_mask_types>(fitsfile, *this, *metadata, bbox, origin);
+    std::cerr << fitsfile.getHdu() << " " << this->operator()(0, 0) << std::endl;
 
     // look for mask planes in the file
     MaskPlaneDict fileMaskDict = parseMaskPlaneMetadata(metadata);

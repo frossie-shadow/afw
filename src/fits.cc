@@ -939,7 +939,6 @@ void Fits::writeImageImpl(
 
     long numPixels = 1;
     for (int ii = 0; ii < nDims; ++ii) numPixels *= dims[ii];
-//    if (nDims == 0 || numPixels == 0) return;
 
     // Write the pixels
     fits_write_img(fits, FitsType<T>::CONSTANT, 1, numPixels, const_cast<T *>(array), &status);
@@ -947,6 +946,7 @@ void Fits::writeImageImpl(
         LSST_FITS_CHECK_STATUS(*this, "Writing image");
     }
 
+#if 1
     // cfitsio says this is deprecated, but Pan-STARRS found that it was sometimes necessary:
     // "This forces a re-scan of the header to ensure everything's kosher.
     // Without this, compressed HDUs have been written out with PCOUNT=0 and TFORM1 not correctly set."
@@ -954,6 +954,7 @@ void Fits::writeImageImpl(
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Finalizing header");
     }
+#endif
 }
 
 
@@ -1016,7 +1017,7 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
         LSST_FITS_CHECK_STATUS(*this, "Setting compression type");
     }
 
-    if (comp.scheme == ImageCompressionOptions::COMPRESS_NONE) {
+    if (comp.scheme == ImageCompressionOptions::NONE) {
         // Nothing else worth doing
         return;
     }
@@ -1026,9 +1027,11 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
         LSST_FITS_CHECK_STATUS(*this, "Setting tile dimensions");
     }
 
-    fits_set_quantize_level(fits, comp.quantizeLevel, &status);
-    if (behavior & AUTO_CHECK) {
-        LSST_FITS_CHECK_STATUS(*this, "Setting quantization level");
+    if (comp.scheme != ImageCompressionOptions::PLIO && std::isfinite(comp.quantizeLevel)) {
+        fits_set_quantize_level(fits, comp.quantizeLevel, &status);
+        if (behavior & AUTO_CHECK) {
+            LSST_FITS_CHECK_STATUS(*this, "Setting quantization level");
+        }
     }
 }
 
@@ -1145,6 +1148,34 @@ std::shared_ptr<daf::base::PropertyList> readMetadata(fits::Fits &fitsfile, bool
     }
     return metadata;
 }
+
+bool Fits::checkCompressedImagePhu() {
+    auto fits = reinterpret_cast<fitsfile *>(fptr);
+    if (getHdu() != 0 || countHdus() == 1) {
+        return false;  // Can't possibly be the PHU leading a compressed image
+    }
+    // Check NAXIS = 0
+    int naxis;
+    fits_get_img_dim(fits, &naxis, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Checking NAXIS of PHU");
+    }
+    if (naxis != 0) {
+        return false;
+    }
+    // Check first extension
+    setHdu(1);
+    bool isCompressed = fits_is_compressed_image(fits, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Checking compression");
+    }
+    if (!isCompressed) {
+        // Move back to the PHU
+        setHdu(0);
+    }
+    return isCompressed;
+}
+
 
 #define INSTANTIATE_KEY_OPS(r, data, T)                                                            \
     template void Fits::updateKey(std::string const &, T const &, std::string const &);            \

@@ -133,7 +133,7 @@ class ReadFitsTestCase(lsst.utils.tests.TestCase):
                 im.writeFits(tmpFile, None, mode)
 
             for hdu in range(4):
-                im = afwImage.ImageF(tmpFile, hdu)
+                im = afwImage.ImageF(tmpFile, hdu + 1)  # +1 allows for PHU
                 self.assertEqual(im.get(0, 0), 100*hdu)
 
     def testWriteBool(self):

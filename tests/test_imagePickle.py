@@ -52,8 +52,8 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
         image = factory(self.xSize, self.ySize)
         image.setXY0(afwGeom.Point2I(self.x0, self.y0))
         image.getImage().getArray()[:] = self.createPattern()
-        image.getMask().getArray()[:] = self.createPattern()
-        image.getVariance().getArray()[:] = self.createPattern()
+        image.getMask().getArray()[:] = self.createPattern() + 1
+        image.getVariance().getArray()[:] = self.createPattern() + 100.0
         return image
 
     def createPattern(self):
@@ -73,6 +73,8 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
 
     def checkImages(self, original):
         image = pickle.loads(pickle.dumps(original))
+        original.writeFits("original.fits")
+        image.writeFits("image.fits")
         self.assertImagesEqual(image, original)
 
     def checkExposures(self, original):
@@ -99,6 +101,17 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
                             afwImage.MaskedImageD,
                             ):
             image = self.createMaskedImage(MaskedImage)
+
+
+            pp = image.__reduce__()
+            open("foo.fits", "w").write(pp[1][1])
+            import pyfits
+            ff = pyfits.open("foo.fits")
+            print(ff[2].data)
+            import pdb;pdb.set_trace()
+
+
+
             self.checkImages(image)
             exposure = afwImage.makeExposure(image, wcs)
             self.checkExposures(exposure)

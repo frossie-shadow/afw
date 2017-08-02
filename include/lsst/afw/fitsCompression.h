@@ -3,6 +3,7 @@
 #define LSST_AFW_fitsCompression_h_INCLUDED
 
 #include <string>
+#include <limits>
 
 #include "lsst/pex/exceptions.h"
 #include "lsst/daf/base.h"
@@ -26,11 +27,11 @@ struct ImageCompressionOptions {
     // We deliberately don't support HCOMPRESS: it doesn't appear to be useful to us (e.g., lossy)
     // and it requires extra configuration.
     enum CompressionScheme {
-        COMPRESS_NONE,              ///< No compression
-        COMPRESS_GZIP,              ///< Standard GZIP compression
-        COMPRESS_GZIP_SORTED,       ///< GZIP compression with sorting
-        COMPRESS_RICE,              ///< RICE compression
-        COMPRESS_PLIO,              ///< PLIO compression
+        NONE,              ///< No compression
+        GZIP,              ///< Standard GZIP compression
+        GZIP_SHUFFLE,      ///< GZIP compression with shuffle (most-significant byte first)
+        RICE,              ///< RICE compression
+        PLIO,              ///< PLIO compression
     };
     typedef ndarray::Array<long, 1> Tiles;
 
@@ -47,14 +48,15 @@ struct ImageCompressionOptions {
     /// Default compression for a particular style of image
     template <typename T>
     explicit ImageCompressionOptions(image::Image<T> const& image)
-      : scheme(image.getBBox().getArea() > 0 ? COMPRESS_GZIP_SORTED : COMPRESS_NONE),
-        quantizeLevel(0.0) {
+        : scheme(image.getBBox().getArea() > 0 ? GZIP : NONE),
+          quantizeLevel(0.0) {
         tiles = ndarray::allocate(2);
         tiles.asEigen() = image.getDimensions().asEigen().template cast<long>();
     }
     template <typename T>
     explicit ImageCompressionOptions(image::Mask<T> const& mask)
-      : scheme(mask.getBBox().getArea() > 0 ? COMPRESS_GZIP : COMPRESS_NONE), quantizeLevel(0.0) {
+        : scheme(mask.getBBox().getArea() > 0 ? GZIP : NONE),
+          quantizeLevel(std::numeric_limits<float>::quiet_NaN()) {
         tiles = ndarray::allocate(2);
         tiles.asEigen() = mask.getDimensions().asEigen().template cast<long>();
     }

@@ -15,24 +15,24 @@ namespace fits {
 
 ImageCompressionOptions::CompressionScheme compressionSchemeFromString(std::string const& name)
 {
-    if (name == "NONE") return ImageCompressionOptions::COMPRESS_NONE;
-    if (name == "GZIP") return ImageCompressionOptions::COMPRESS_GZIP;
-    if (name == "GZIP_SORTED") return ImageCompressionOptions::COMPRESS_GZIP_SORTED;
-    if (name == "RICE") return ImageCompressionOptions::COMPRESS_RICE;
+    if (name == "NONE") return ImageCompressionOptions::NONE;
+    if (name == "GZIP") return ImageCompressionOptions::GZIP;
+    if (name == "GZIP_SHUFFLE") return ImageCompressionOptions::GZIP_SHUFFLE;
+    if (name == "RICE") return ImageCompressionOptions::RICE;
     if (name == "HCOMPRESS") throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
                                                "HCOMPRESS is unsupported");
-    if (name == "PLIO") return ImageCompressionOptions::COMPRESS_PLIO;
+    if (name == "PLIO") return ImageCompressionOptions::PLIO;
     throw LSST_EXCEPT(pex::exceptions::InvalidParameterError, "Unrecognised compression scheme: " + name);
 }
 
 std::string compressionSchemeToString(ImageCompressionOptions::CompressionScheme scheme)
 {
     switch (scheme) {
-      case ImageCompressionOptions::COMPRESS_NONE: return "NONE";
-      case ImageCompressionOptions::COMPRESS_GZIP: return "GZIP";
-      case ImageCompressionOptions::COMPRESS_GZIP_SORTED: return "GZIP_SORTED";
-      case ImageCompressionOptions::COMPRESS_RICE: return "RICE";
-      case ImageCompressionOptions::COMPRESS_PLIO: return "PLIO";
+      case ImageCompressionOptions::NONE: return "NONE";
+      case ImageCompressionOptions::GZIP: return "GZIP";
+      case ImageCompressionOptions::GZIP_SHUFFLE: return "GZIP_SHUFFLE";
+      case ImageCompressionOptions::RICE: return "RICE";
+      case ImageCompressionOptions::PLIO: return "PLIO";
       default:
         std::ostringstream os;
         os << "Unrecognized compression scheme: " << scheme;
@@ -43,11 +43,11 @@ std::string compressionSchemeToString(ImageCompressionOptions::CompressionScheme
 ImageCompressionOptions::CompressionScheme compressionSchemeFromCfitsio(int cfitsio)
 {
     switch (cfitsio) {
-      case 0: return ImageCompressionOptions::COMPRESS_NONE;
-      case RICE_1: return ImageCompressionOptions::COMPRESS_RICE;
-      case GZIP_1: return ImageCompressionOptions::COMPRESS_GZIP;
-      case GZIP_2: return ImageCompressionOptions::COMPRESS_GZIP_SORTED;
-      case PLIO_1: return ImageCompressionOptions::COMPRESS_PLIO;
+      case 0: return ImageCompressionOptions::NONE;
+      case RICE_1: return ImageCompressionOptions::RICE;
+      case GZIP_1: return ImageCompressionOptions::GZIP;
+      case GZIP_2: return ImageCompressionOptions::GZIP_SHUFFLE;
+      case PLIO_1: return ImageCompressionOptions::PLIO;
       case HCOMPRESS_1: throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
                                           "Unsupported compression scheme: HCOMPRESS_1");
       default:
@@ -60,11 +60,11 @@ ImageCompressionOptions::CompressionScheme compressionSchemeFromCfitsio(int cfit
 int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme)
 {
     switch (scheme) {
-      case ImageCompressionOptions::COMPRESS_NONE: return 0;
-      case ImageCompressionOptions::COMPRESS_GZIP: return GZIP_1;
-      case ImageCompressionOptions::COMPRESS_GZIP_SORTED: return GZIP_2;
-      case ImageCompressionOptions::COMPRESS_RICE: return RICE_1;
-      case ImageCompressionOptions::COMPRESS_PLIO: return PLIO_1;
+      case ImageCompressionOptions::NONE: return 0;
+      case ImageCompressionOptions::GZIP: return GZIP_1;
+      case ImageCompressionOptions::GZIP_SHUFFLE: return GZIP_2;
+      case ImageCompressionOptions::RICE: return RICE_1;
+      case ImageCompressionOptions::PLIO: return PLIO_1;
       default:
         std::ostringstream os;
         os << "Unrecognized compression scheme: " << scheme;

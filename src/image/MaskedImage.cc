@@ -178,7 +178,13 @@ MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::MaskedImage(
 
     // setHdu(INT_MIN) jumps to the first extension iff the primary HDU is both
     // empty and currently selected.
+
+#if 0
     fitsfile.setHdu(INT_MIN);
+#else
+    fitsfile.checkCompressedImagePhu();
+#endif
+
     ensureMetadata(imageMetadata);
     _image.reset(new Image(fitsfile, imageMetadata, bbox, origin));
     checkExtType(fitsfile, imageMetadata, "IMAGE");
@@ -193,6 +199,7 @@ MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::MaskedImage(
             fitsfile.setHdu(static_cast<int>(Hdu::Mask));
             ensureMetadata(maskMetadata);
             _mask.reset(new Mask(fitsfile, maskMetadata, bbox, origin, conformMasks));
+            std::cerr << _mask->operator()(0, 0) << std::endl;
             checkExtType(fitsfile, maskMetadata, "MASK");
         } catch (fits::FitsError& e) {
             if (needAllHdus) {

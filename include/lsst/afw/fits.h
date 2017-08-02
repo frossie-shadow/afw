@@ -531,6 +531,8 @@ public:
     void setImageCompression(ImageCompressionOptions const& options);
     ImageCompressionOptions getImageCompression(int nDim);
 
+    bool checkCompressedImagePhu();
+
     ~Fits() {
         if ((fptr) && (behavior & AUTO_CLOSE)) closeFile();
     }
