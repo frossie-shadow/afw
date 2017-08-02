@@ -63,10 +63,10 @@ PYBIND11_PLUGIN(skyWcs) {
     cls.def(py::init<Point2D const &, SpherePoint const &, Eigen::Matrix2d const &>(), "crpix"_a, "crval"_a,
             "cdMatrix"_a);
     cls.def(py::init<daf::base::PropertyList &>(), "metadata"_a);
-    cls.def(py::init<ast::FrameSet const&>(), "frameSet"_a);
+    cls.def(py::init<ast::FrameSet const &>(), "frameSet"_a);
 
-    cls.def("getPixelScale", (Angle (SkyWcs::*)(Point2D const &) const) &SkyWcs::getPixelScale, "pixel"_a);
-    cls.def("getPixelScale", (Angle (SkyWcs::*)() const) &SkyWcs::getPixelScale);
+    cls.def("getPixelScale", (Angle(SkyWcs::*)(Point2D const &) const) & SkyWcs::getPixelScale, "pixel"_a);
+    cls.def("getPixelScale", (Angle(SkyWcs::*)() const) & SkyWcs::getPixelScale);
     cls.def("getPixelOrigin", &SkyWcs::getPixelOrigin);
     cls.def("getSkyOrigin", &SkyWcs::getSkyOrigin);
     cls.def("getCdMatrix", (Eigen::Matrix2d(SkyWcs::*)(Point2D const &) const) & SkyWcs::getCdMatrix,

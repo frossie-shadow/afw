@@ -215,18 +215,14 @@ std::pair<double, double> SkyWcs::skyToPixel(Angle const& ra, Angle const& dec) 
 
 std::string SkyWcs::getShortClassName() { return "SkyWcs"; };
 
-SkyWcs SkyWcs::readStream(std::istream &is) {
-    return detail::readStream<SkyWcs>(is);
-}
+SkyWcs SkyWcs::readStream(std::istream& is) { return detail::readStream<SkyWcs>(is); }
 
-SkyWcs SkyWcs::readString(std::string & str) {
+SkyWcs SkyWcs::readString(std::string& str) {
     std::istringstream is(str);
     return SkyWcs::readStream(is);
 }
 
-void SkyWcs::writeStream(std::ostream &os) const {
-    detail::writeStream<SkyWcs>(*this, os);
-}
+void SkyWcs::writeStream(std::ostream& os) const { detail::writeStream<SkyWcs>(*this, os); }
 
 std::string SkyWcs::writeString() const {
     std::ostringstream os;

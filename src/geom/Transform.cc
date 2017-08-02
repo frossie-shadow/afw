@@ -161,7 +161,7 @@ Transform<FromEndpoint, ToEndpoint> Transform<FromEndpoint, ToEndpoint>::readStr
 }
 
 template <class FromEndpoint, class ToEndpoint>
-Transform<FromEndpoint, ToEndpoint> Transform<FromEndpoint, ToEndpoint>::readString(std::string & str) {
+Transform<FromEndpoint, ToEndpoint> Transform<FromEndpoint, ToEndpoint>::readString(std::string &str) {
     std::istringstream is(str);
     return Transform<FromEndpoint, ToEndpoint>::readStream(is);
 }
