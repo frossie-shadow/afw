@@ -103,6 +103,15 @@ SpherePoint& SpherePoint::operator=(SpherePoint const& other) noexcept = default
 
 SpherePoint& SpherePoint::operator=(SpherePoint&& other) noexcept = default;
 
+Point2D SpherePoint::getPosition(AngleUnit unit) const {
+    // treat hours specially: hours for RA, degrees for Dec
+    if (unit == geom::hours) {
+        return geom::Point2D(getLongitude().asHours(), getLatitude().asDegrees());
+    } else {
+        return geom::Point2D(getLongitude().asAngularUnits(unit), getLatitude().asAngularUnits(unit));
+    }
+}
+
 Point3D SpherePoint::getVector() const noexcept {
     return Point3D(cos(_longitude) * cos(_latitude), sin(_longitude) * cos(_latitude), sin(_latitude));
 }

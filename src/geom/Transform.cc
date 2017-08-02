@@ -203,24 +203,24 @@ std::ostream &operator<<(std::ostream &os, Transform<FromEndpoint, ToEndpoint> c
     Transform<FromEndpoint, ToEndpoint>::then<NextToEndpoint>(          \
             Transform<ToEndpoint, NextToEndpoint> const &next) const;
 
-#define INSTANTIATE_TRANSFORM(FromEndpoint, ToEndpoint)                \
-    template class Transform<FromEndpoint, ToEndpoint>;                \
-    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, GenericEndpoint)   \
-    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, Point2Endpoint)    \
-    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, IcrsCoordEndpoint) \
-    template std::ostream &operator<<<FromEndpoint, ToEndpoint>(       \
+#define INSTANTIATE_TRANSFORM(FromEndpoint, ToEndpoint)                  \
+    template class Transform<FromEndpoint, ToEndpoint>;                  \
+    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, GenericEndpoint)     \
+    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, Point2Endpoint)      \
+    INSTANTIATE_OVERLOADS(FromEndpoint, ToEndpoint, SpherePointEndpoint) \
+    template std::ostream &operator<<<FromEndpoint, ToEndpoint>(         \
             std::ostream &os, Transform<FromEndpoint, ToEndpoint> const &transform);
 
 // explicit instantiations
 INSTANTIATE_TRANSFORM(GenericEndpoint, GenericEndpoint);
 INSTANTIATE_TRANSFORM(GenericEndpoint, Point2Endpoint);
-INSTANTIATE_TRANSFORM(GenericEndpoint, IcrsCoordEndpoint);
+INSTANTIATE_TRANSFORM(GenericEndpoint, SpherePointEndpoint);
 INSTANTIATE_TRANSFORM(Point2Endpoint, GenericEndpoint);
 INSTANTIATE_TRANSFORM(Point2Endpoint, Point2Endpoint);
-INSTANTIATE_TRANSFORM(Point2Endpoint, IcrsCoordEndpoint);
-INSTANTIATE_TRANSFORM(IcrsCoordEndpoint, GenericEndpoint);
-INSTANTIATE_TRANSFORM(IcrsCoordEndpoint, Point2Endpoint);
-INSTANTIATE_TRANSFORM(IcrsCoordEndpoint, IcrsCoordEndpoint);
+INSTANTIATE_TRANSFORM(Point2Endpoint, SpherePointEndpoint);
+INSTANTIATE_TRANSFORM(SpherePointEndpoint, GenericEndpoint);
+INSTANTIATE_TRANSFORM(SpherePointEndpoint, Point2Endpoint);
+INSTANTIATE_TRANSFORM(SpherePointEndpoint, SpherePointEndpoint);
 
 }  // namespace geom
 }  // namespace afw

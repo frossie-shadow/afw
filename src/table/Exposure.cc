@@ -304,7 +304,7 @@ void ExposureRecord::setBBox(geom::Box2I const &bbox) {
     set(ExposureTable::getBBoxMaxKey(), bbox.getMax());
 }
 
-bool ExposureRecord::contains(Coord const &coord, bool includeValidPolygon) const {
+bool ExposureRecord::contains(geom::SpherePoint const &coord, bool includeValidPolygon) const {
     if (!getWcs()) {
         throw LSST_EXCEPT(pex::exceptions::LogicError,
                           "ExposureRecord does not have a Wcs; cannot call contains()");
@@ -423,7 +423,7 @@ ExposureCatalogT<RecordT> ExposureCatalogT<RecordT>::readFromArchive(io::InputAr
 }
 
 template <typename RecordT>
-ExposureCatalogT<RecordT> ExposureCatalogT<RecordT>::subsetContaining(Coord const &coord,
+ExposureCatalogT<RecordT> ExposureCatalogT<RecordT>::subsetContaining(geom::SpherePoint const &coord,
                                                                       bool includeValidPolygon) const {
     ExposureCatalogT result(this->getTable());
     for (const_iterator i = this->begin(); i != this->end(); ++i) {

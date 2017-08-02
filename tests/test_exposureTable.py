@@ -40,6 +40,7 @@ import lsst.utils.tests
 import lsst.pex.exceptions
 from lsst.daf.base import DateTime, PropertySet
 import lsst.afw.table
+import lsst.afw.geom
 from lsst.afw.geom import arcseconds, degrees, radians, Point2D
 import lsst.afw.coord
 import lsst.afw.image
@@ -85,8 +86,8 @@ class ExposureTableTestCase(lsst.utils.tests.TestCase):
             DateTime(65321.1, DateTime.MJD, DateTime.TAI),
             12345.1,
             45.1*lsst.afw.geom.degrees,
-            lsst.afw.coord.IcrsCoord(23.1*degrees, 73.2*degrees),
-            lsst.afw.coord.Coord(134.5*degrees, 33.3*degrees),
+            lsst.afw.geom.SpherePoint(23.1*degrees, 73.2*degrees),
+            lsst.afw.geom.SpherePoint(134.5*degrees, 33.3*degrees),
             1.73,
             73.2*degrees,
             lsst.afw.image.RotType.SKY,
@@ -202,8 +203,8 @@ class ExposureTableTestCase(lsst.utils.tests.TestCase):
         # make a very slightly perturbed wcs so the celestial transform isn't a
         # no-op
         crval2 = self.wcs.getSkyOrigin()
-        crval2.reset(crval2.getLongitude() + 5*arcseconds,
-                     crval2.getLatitude() - 5*arcseconds)
+        crval2 = lsst.afw.geom.SpherePoint(crval2.getLongitude() + 5*arcseconds,
+                                           crval2.getLatitude() - 5*arcseconds)
         wcs2 = lsst.afw.image.Wcs(
             crval2.getPosition(),
             self.wcs.getPixelOrigin() + lsst.afw.geom.Extent2D(30.0, -50.0),
@@ -223,8 +224,8 @@ class ExposureTableTestCase(lsst.utils.tests.TestCase):
                 self.assertEqual(inside, record in subset1)
                 self.assertEqual(inside, record in subset2)
 
-        crazyPoint = lsst.afw.coord.IcrsCoord(crval2.getLongitude() + np.pi*radians,
-                                              crval2.getLatitude())
+        crazyPoint = lsst.afw.geom.SpherePoint(crval2.getLongitude() + np.pi*radians,
+                                               crval2.getLatitude())
         subset3 = self.cat.subsetContaining(crazyPoint)
         self.assertEqual(len(subset3), 0)
 

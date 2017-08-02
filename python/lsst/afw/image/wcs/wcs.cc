@@ -29,10 +29,10 @@
 
 #include "lsst/daf/base/Citizen.h"
 #include "lsst/daf/base/PropertySet.h"
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/AffineTransform.h"
 #include "lsst/afw/geom/Extent.h"
 #include "lsst/afw/geom/Point.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/XYTransform.h"
 #include "lsst/afw/table/io/Persistable.h"
 #include "lsst/afw/table/io/python.h"  // for declarePersistableFacade
@@ -82,13 +82,14 @@ void declareWcs(py::module &mod) {
     cls.def("isFlipped", &Wcs::isFlipped);
     cls.def("pixArea", &Wcs::pixArea);
     cls.def("pixelScale", &Wcs::pixelScale);
-    cls.def("pixelToSky", (std::shared_ptr<coord::Coord> (Wcs::*)(double, double) const) & Wcs::pixelToSky);
     cls.def("pixelToSky",
-            (std::shared_ptr<coord::Coord> (Wcs::*)(geom::Point2D const &) const) & Wcs::pixelToSky);
+            (std::shared_ptr<geom::SpherePoint>(Wcs::*)(double, double) const) & Wcs::pixelToSky);
+    cls.def("pixelToSky",
+            (std::shared_ptr<geom::SpherePoint>(Wcs::*)(geom::Point2D const &) const) & Wcs::pixelToSky);
     cls.def("pixelToSky",
             (void (Wcs::*)(double, double, geom::Angle &, geom::Angle &) const) & Wcs::pixelToSky);
     cls.def("skyToPixel", (geom::Point2D (Wcs::*)(geom::Angle, geom::Angle) const) & Wcs::skyToPixel);
-    cls.def("skyToPixel", (geom::Point2D (Wcs::*)(coord::Coord const &) const) & Wcs::skyToPixel);
+    cls.def("skyToPixel", (geom::Point2D (Wcs::*)(geom::SpherePoint const &) const) & Wcs::skyToPixel);
     cls.def("skyToIntermediateWorldCoord", &Wcs::skyToIntermediateWorldCoord);
     cls.def("hasDistortion", &Wcs::hasDistortion);
     cls.def("getCoordSystem", &Wcs::getCoordSystem);
@@ -96,7 +97,7 @@ void declareWcs(py::module &mod) {
     cls.def("isSameSkySystem", &Wcs::isSameSkySystem);
     cls.def("getLinearTransform", &Wcs::getLinearTransform);
     cls.def("linearizePixelToSky",
-            (geom::AffineTransform (Wcs::*)(coord::Coord const &, geom::AngleUnit) const) &
+            (geom::AffineTransform (Wcs::*)(geom::SpherePoint const &, geom::AngleUnit) const) &
                     Wcs::linearizePixelToSky,
             "coord"_a, "skyUnit"_a = geom::degrees);
     cls.def("linearizePixelToSky",
@@ -104,7 +105,7 @@ void declareWcs(py::module &mod) {
                     Wcs::linearizePixelToSky,
             "coord"_a, "skyUnit"_a = geom::degrees);
     cls.def("linearizeSkyToPixel",
-            (geom::AffineTransform (Wcs::*)(coord::Coord const &, geom::AngleUnit) const) &
+            (geom::AffineTransform (Wcs::*)(geom::SpherePoint const &, geom::AngleUnit) const) &
                     Wcs::linearizeSkyToPixel,
             "coord"_a, "skyUnit"_a = geom::degrees);
     cls.def("linearizeSkyToPixel",
@@ -138,7 +139,7 @@ PYBIND11_PLUGIN(wcs) {
     mod.def("makeWcs",
             (std::shared_ptr<Wcs>(*)(std::shared_ptr<daf::base::PropertySet> const &, bool)) & makeWcs,
             "fitsMetadata"_a, "stripMetadata"_a = false);
-    mod.def("makeWcs", (std::shared_ptr<Wcs>(*)(coord::Coord const &, lsst::afw::geom::Point2D const &,
+    mod.def("makeWcs", (std::shared_ptr<Wcs>(*)(geom::SpherePoint const &, lsst::afw::geom::Point2D const &,
                                                 double, double, double, double)) &
                                makeWcs);
 

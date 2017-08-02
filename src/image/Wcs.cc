@@ -43,6 +43,7 @@
 #include "lsst/afw/image/Wcs.h"
 #include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Angle.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/table/io/OutputArchive.h"
 #include "lsst/afw/table/io/InputArchive.h"
 #include "lsst/afw/table/io/CatalogVector.h"
@@ -55,7 +56,7 @@ using namespace std;
 typedef lsst::daf::base::PropertySet PropertySet;
 typedef lsst::daf::base::PropertyList PropertyList;
 typedef lsst::afw::geom::Point2D GeomPoint;
-typedef std::shared_ptr<lsst::afw::coord::Coord> CoordPtr;
+typedef std::shared_ptr<lsst::afw::geom::SpherePoint> CoordPtr;
 
 // The amount of space allocated to strings in wcslib
 const int STRLEN = 72;
@@ -531,7 +532,8 @@ std::shared_ptr<Wcs> Wcs::clone(void) const { return std::shared_ptr<Wcs>(new Wc
 
 CoordPtr Wcs::getSkyOrigin() const {
     assert(_wcsInfo);
-    return makeCorrectCoord(_wcsInfo->crval[0] * geom::degrees, _wcsInfo->crval[1] * geom::degrees);
+    return std::make_shared<geom::SpherePoint>(_wcsInfo->crval[0] * geom::degrees,
+                                               _wcsInfo->crval[1] * geom::degrees);
 }
 
 GeomPoint Wcs::getPixelOrigin() const {
@@ -728,34 +730,22 @@ GeomPoint Wcs::skyToPixelImpl(geom::Angle sky1, geom::Angle sky2) const {
                          pixTmp[1] + PixelZeroPos + fitsToLsstPixels);
 }
 
-GeomPoint Wcs::skyToPixel(coord::Coord const& coord) const {
-    std::shared_ptr<coord::Coord> sky = convertCoordToSky(coord);
-    return skyToPixelImpl(sky->getLongitude(), sky->getLatitude());
-}
-
-std::shared_ptr<coord::Coord> Wcs::convertCoordToSky(coord::Coord const& coord) const {
-    return coord.convert(_coordSystem, _wcsInfo->equinox);
+GeomPoint Wcs::skyToPixel(geom::SpherePoint const& coord) const {
+    return skyToPixelImpl(coord.getLongitude(), coord.getLatitude());
 }
 
 GeomPoint Wcs::skyToPixel(geom::Angle sky1, geom::Angle sky2) const { return skyToPixelImpl(sky1, sky2); }
 
-GeomPoint Wcs::skyToIntermediateWorldCoord(coord::Coord const& coord) const {
+GeomPoint Wcs::skyToIntermediateWorldCoord(geom::SpherePoint const& coord) const {
     assert(_wcsInfo);
 
-    std::shared_ptr<coord::Coord> sky = convertCoordToSky(coord);
     double skyTmp[2];
     double imgcrd[2];
     double phi, theta;
     double pixTmp[2];
 
-    /*
-     printf("skyToIWC: _coordSystem = %i\n", (int)_coordSystem);
-     printf("coord (%.3f, %.3f)\n", coord->getLongitude().asDegrees(), coord->getLatitude().asDegrees());
-     printf("->sky (%.3f, %.3f)\n", sky->getLongitude().asDegrees(), sky->getLatitude().asDegrees());
-     */
-
-    skyTmp[_wcsInfo->lng] = sky->getLongitude().asDegrees();
-    skyTmp[_wcsInfo->lat] = sky->getLatitude().asDegrees();
+    skyTmp[_wcsInfo->lng] = coord.getLongitude().asDegrees();
+    skyTmp[_wcsInfo->lat] = coord.getLatitude().asDegrees();
 
     // Estimate pixel coordinates
     int stat[1];
@@ -775,7 +765,7 @@ GeomPoint Wcs::skyToIntermediateWorldCoord(coord::Coord const& coord) const {
     /*
      printf("->iwc (%.3f, %.3f)\n", imgcrd[0], imgcrd[1]);
      printf("-> pix (%.2f, %.2f)\n", pixTmp[0], pixTmp[1]);
-     std::shared_ptr<coord::Coord> crval = getSkyOrigin();
+     std::shared_ptr<geom::SpherePoint> crval = getSkyOrigin();
      printf("(crval is (%.3f, %.3f))\n", crval->getLongitude().asDegrees(), crval->getLatitude().asDegrees());
      */
     return GeomPoint(imgcrd[0], imgcrd[1]);
@@ -824,7 +814,7 @@ CoordPtr Wcs::pixelToSky(double pixel1, double pixel2) const {
 
     geom::Angle skyTmp[2];
     pixelToSkyImpl(pixel1, pixel2, skyTmp);
-    return makeCorrectCoord(skyTmp[0], skyTmp[1]);
+    return std::make_shared<geom::SpherePoint>(skyTmp[0], skyTmp[1]);
 }
 
 void Wcs::pixelToSky(double pixel1, double pixel2, geom::Angle& sky1, geom::Angle& sky2) const {
@@ -838,36 +828,14 @@ void Wcs::pixelToSky(double pixel1, double pixel2, geom::Angle& sky1, geom::Angl
     sky2 = skyTmp[1];
 }
 
-CoordPtr Wcs::makeCorrectCoord(geom::Angle sky0, geom::Angle sky1) const {
-    auto coordSystem = getCoordSystem();
-    if ((coordSystem == coord::ICRS) || (coordSystem == coord::GALACTIC)) {
-        // equinox not relevant
-        if (_skyAxesSwapped) {
-            return coord::makeCoord(coordSystem, sky1, sky0);
-        } else {
-            return coord::makeCoord(coordSystem, sky0, sky1);
-        }
-    } else if ((coordSystem == coord::FK5) || (coordSystem == coord::ECLIPTIC)) {
-        if (_skyAxesSwapped) {
-            return coord::makeCoord(coordSystem, sky1, sky0, _wcsInfo->equinox);
-        } else {
-            return coord::makeCoord(coordSystem, sky0, sky1, _wcsInfo->equinox);
-        }
-    }
-    throw LSST_EXCEPT(
-            except::RuntimeError,
-            (boost::format("Can't create Coord object: Unrecognised coordinate system %s") % coordSystem)
-                    .str());
-}
-
-geom::AffineTransform Wcs::linearizePixelToSky(coord::Coord const& coord, geom::AngleUnit skyUnit) const {
+geom::AffineTransform Wcs::linearizePixelToSky(geom::SpherePoint const& coord, geom::AngleUnit skyUnit) const {
     return linearizePixelToSkyInternal(skyToPixel(coord), coord, skyUnit);
 }
 geom::AffineTransform Wcs::linearizePixelToSky(GeomPoint const& pix, geom::AngleUnit skyUnit) const {
     return linearizePixelToSkyInternal(pix, *pixelToSky(pix), skyUnit);
 }
 
-geom::AffineTransform Wcs::linearizePixelToSkyInternal(GeomPoint const& pix00, coord::Coord const& coord,
+geom::AffineTransform Wcs::linearizePixelToSkyInternal(GeomPoint const& pix00, geom::SpherePoint const& coord,
                                                        geom::AngleUnit skyUnit) const {
     //
     // Figure out the (0, 0), (0, 1), and (1, 0) ra/dec coordinates of the corners of a square drawn in pixel
@@ -877,8 +845,10 @@ geom::AffineTransform Wcs::linearizePixelToSkyInternal(GeomPoint const& pix00, c
     const double side = 10;  // length of the square's sides in pixels
     GeomPoint const sky00 = coord.getPosition(skyUnit);
     typedef std::pair<geom::Angle, geom::Angle> AngleAngle;
-    AngleAngle const dsky10 = coord.getTangentPlaneOffset(*pixelToSky(pix00 + geom::Extent2D(side, 0)));
-    AngleAngle const dsky01 = coord.getTangentPlaneOffset(*pixelToSky(pix00 + geom::Extent2D(0, side)));
+    AngleAngle const dsky10 =
+            coord::getTangentPlaneOffset(*pixelToSky(pix00 + geom::Extent2D(side, 0)), coord);
+    AngleAngle const dsky01 =
+            coord::getTangentPlaneOffset(*pixelToSky(pix00 + geom::Extent2D(0, side)), coord);
 
     Eigen::Matrix2d m;
     m(0, 0) = dsky10.first.asAngularUnits(skyUnit) / side;
@@ -894,7 +864,7 @@ geom::AffineTransform Wcs::linearizePixelToSkyInternal(GeomPoint const& pix00, c
     return geom::AffineTransform(m, (sky00v - m * pix00v));
 }
 
-geom::AffineTransform Wcs::linearizeSkyToPixel(coord::Coord const& coord, geom::AngleUnit skyUnit) const {
+geom::AffineTransform Wcs::linearizeSkyToPixel(geom::SpherePoint const& coord, geom::AngleUnit skyUnit) const {
     return linearizeSkyToPixelInternal(skyToPixel(coord), coord, skyUnit);
 }
 
@@ -902,7 +872,7 @@ geom::AffineTransform Wcs::linearizeSkyToPixel(GeomPoint const& pix, geom::Angle
     return linearizeSkyToPixelInternal(pix, *pixelToSky(pix), skyUnit);
 }
 
-geom::AffineTransform Wcs::linearizeSkyToPixelInternal(GeomPoint const& pix00, coord::Coord const& coord,
+geom::AffineTransform Wcs::linearizeSkyToPixelInternal(GeomPoint const& pix00, geom::SpherePoint const& coord,
                                                        geom::AngleUnit skyUnit) const {
     geom::AffineTransform inverse = linearizePixelToSkyInternal(pix00, coord, skyUnit);
     return inverse.invert();
@@ -1173,7 +1143,7 @@ geom::Point2D XYTransformFromWcsPair::forwardTransform(Point2D const& pixel) con
         _src->pixelToSky(pixel[0], pixel[1], sky0, sky1);
         return _dst->skyToPixel(sky0, sky1);
     } else {
-        std::shared_ptr<afw::coord::Coord const> coordPtr{_src->pixelToSky(pixel)};
+        std::shared_ptr<afw::geom::SpherePoint const> coordPtr{_src->pixelToSky(pixel)};
         return _dst->skyToPixel(*coordPtr);
     }
 }
@@ -1185,7 +1155,7 @@ geom::Point2D XYTransformFromWcsPair::reverseTransform(Point2D const& pixel) con
         _dst->pixelToSky(pixel[0], pixel[1], sky0, sky1);
         return _src->skyToPixel(sky0, sky1);
     } else {
-        std::shared_ptr<afw::coord::Coord const> coordPtr{_dst->pixelToSky(pixel)};
+        std::shared_ptr<afw::geom::SpherePoint const> coordPtr{_dst->pixelToSky(pixel)};
         return _src->skyToPixel(*coordPtr);
     }
 }

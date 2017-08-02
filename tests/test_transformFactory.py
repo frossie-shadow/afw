@@ -42,7 +42,7 @@ class transformFactoryTestSuite(TransformTestBaseClass):
     def setUp(self):
         TransformTestBaseClass.setUp(self)
         self.endpointPrefixes = tuple(
-            x for x in self.endpointPrefixes if x != "IcrsCoord")
+            x for x in self.endpointPrefixes if x != "SpherePoint")
 
     def testLinearize(self):
         for fromName in self.endpointPrefixes:

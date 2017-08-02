@@ -36,7 +36,7 @@ def updateRefCentroids(wcs, refList):
 
     @param[in] wcs  WCS to map from sky to pixels; an lsst.afw.image.Wcs
     @param[in,out] refList  collection of reference objects (lsst.afw.table.SimpleRecords); for each:
-                            - read field "coords", an lsst.afw.coord.Coord
+                            - read field "coord", an lsst.afw.geom.SpherePoint
                             - write field "centroid", an lsst.afw.geom.Point2D
     """
     if len(refList) < 1:
@@ -59,7 +59,7 @@ def updateSourceCoords(wcs, sourceList):
     @param[in] wcs  WCS to map from pixels to sky; an lsst.afw.image.Wcs
     @param[in,out] sourceList   collection of sources (lsst.afw.table.SourceRecords); for each:
                                 - read centroid using getCentroid()
-                                - write field "coord", an lsst.afw.coord.Coord
+                                - write field "coord", an lsst.afw.geom.SpherePoint
     """
     if len(sourceList) < 1:
         return

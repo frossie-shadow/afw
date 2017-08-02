@@ -80,8 +80,8 @@ int main(int argc, char **argv) {
     afwGeom::Point2D minCoord = afwGeom::Point2D(1.0, 1.0);
     afwGeom::Point2D xy = afwGeom::Point2D(exposure.getWidth(), exposure.getHeight());
 
-    std::shared_ptr<afwCoord::Coord const> sky1 = wcs->pixelToSky(minCoord);
-    std::shared_ptr<afwCoord::Coord const> sky2 = wcs->pixelToSky(xy);
+    auto sky1 = wcs->pixelToSky(minCoord);
+    auto sky2 = wcs->pixelToSky(xy);
 
     afwGeom::Angle miRa1 = sky1->getLongitude();
     afwGeom::Angle miDecl1 = sky1->getLatitude();
@@ -116,17 +116,17 @@ int main(int argc, char **argv) {
               << "col: " << pix2[0] << " row: " << pix2[1] << std::endl
               << std::endl;
 
-    std::shared_ptr<afwCoord::Coord const> raDecl1 = makeCoord(afwCoord::FK5, miRa1, miDecl1);
-    std::shared_ptr<afwCoord::Coord const> raDecl2 = makeCoord(afwCoord::FK5, miRa2, miDecl2);
+    afwGeom::SpherePoint raDecl1(miRa1, miDecl1);
+    afwGeom::SpherePoint  raDecl2(miRa2, miDecl2);
 
-    afwGeom::Point2D pix3 = wcs->skyToPixel(*raDecl1);
-    afwGeom::Point2D pix4 = wcs->skyToPixel(*raDecl2);
+    afwGeom::Point2D pix3 = wcs->skyToPixel(raDecl1);
+    afwGeom::Point2D pix4 = wcs->skyToPixel(raDecl2);
 
-    std::cout << "col, row of " << inImagePath << " at (" << (*raDecl1)[0] << " " << (*raDecl1)[1] << ") = "
+    std::cout << "col, row of " << inImagePath << " at (" << raDecl1[0] << " " << raDecl1[1] << ") = "
               << "col: " << pix3[0] << " row: " << pix3[1] << std::endl
               << std::endl;
 
-    std::cout << "col, row of " << inImagePath << " at (" << (*raDecl2)[0] << " " << (*raDecl2)[1] << ") = "
+    std::cout << "col, row of " << inImagePath << " at (" << raDecl2[0] << " " << raDecl2[1] << ") = "
               << "col: " << pix4[0] << " row: " << pix4[1] << std::endl
               << std::endl;
 }

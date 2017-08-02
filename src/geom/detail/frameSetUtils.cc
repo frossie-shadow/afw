@@ -31,9 +31,9 @@
 #include "astshim.h"
 
 #include "lsst/afw/formatters/Utils.h"
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Angle.h"
 #include "lsst/afw/geom/Point.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/detail/frameSetUtils.h"
 #include "lsst/daf/base/PropertyList.h"
 #include "lsst/pex/exceptions.h"
@@ -63,7 +63,7 @@ std::shared_ptr<ast::SkyFrame> getSkyFrame(ast::FrameSet const& frameSet, int in
 }
 
 std::shared_ptr<daf::base::PropertyList> makeTanWcsMetadata(Point2D const& crpix,
-                                                            coord::IcrsCoord const& crval,
+                                                            SpherePoint const& crval,
                                                             Eigen::Matrix2d const& cdMatrix) {
     auto pl = std::make_shared<daf::base::PropertyList>();
     pl->add("RADESYS", "ICRS");

@@ -106,8 +106,8 @@ class DistortedTanWcsTestCase(lsst.utils.tests.TestCase):
                 self.assertEqual(predSky, predSkyCopy)
 
                 measSky = distortedWcs.pixelToSky(pixPos)
-                self.assertLess(
-                    predSky.angularSeparation(measSky).asRadians(), 1e-7)
+                self.assertSpherePointsAlmostEqual(measSky, predSky,
+                                                   maxSep = 1e-7 * afwGeom.radians)
 
                 pixPosRoundTrip = distortedWcs.skyToPixel(measSky)
                 for i in range(2):

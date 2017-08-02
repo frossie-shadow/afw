@@ -33,7 +33,6 @@ import numpy as np
 import lsst.utils
 import lsst.utils.tests
 import lsst.daf.base as dafBase
-import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -78,7 +77,7 @@ def makeWcs(pixelScale, crPixPos, crValCoord, posAng=afwGeom.Angle(0.0), doFlipX
 
     @param[in] pixelScale: desired scale, as sky/pixel, an afwGeom.Angle
     @param[in] crPixPos: crPix for WCS, using the LSST standard; a pair of floats
-    @param[in] crValCoord: crVal for WCS (afwCoord.Coord)
+    @param[in] crValCoord: crVal for WCS, ICRS RA/Dec (afwGeom.SpherePoint)
     @param[in] posAng: position angle (afwGeom.Angle)
     @param[in] doFlipX: flip X axis?
     @param[in] projection: WCS projection (e.g. "TAN" or "STG")
@@ -384,55 +383,6 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
         self.compareToSwarp("nearest", useWarpExposure=True, atol=60)
 
     @unittest.skipIf(afwdataDir is None, "afwdata not setup")
-    def testNonIcrs(self):
-        """Test that warping to a non-ICRS-like coordinate system produces different results
-
-        It would be better to also test that the results are as expected,
-        but I have not been able to get swarp to perform this operation,
-        so have not found an independent means of generating the expected results.
-        """
-        kernelName = "lanczos3"
-        rtol = 4e-5
-        atol = 1e-2
-        warpingControl = afwMath.WarpingControl(
-            kernelName,
-        )
-
-        originalExposure = afwImage.ExposureF(originalExposurePath)
-        originalImage = originalExposure.getMaskedImage().getImage()
-        originalWcs = originalExposure.getWcs()
-
-        swarpedImageName = "medswarp1%s.fits" % (kernelName,)
-        swarpedImagePath = os.path.join(dataDir, swarpedImageName)
-        swarpedDecoratedImage = afwImage.DecoratedImageF(swarpedImagePath)
-        swarpedImage = swarpedDecoratedImage.getImage()
-
-        for changeEquinox in (False, True):
-            swarpedMetadata = swarpedDecoratedImage.getMetadata()
-            if changeEquinox:
-                swarpedMetadata.set("RADECSYS", "FK5")
-                swarpedMetadata.set(
-                    "EQUINOX", swarpedMetadata.get("EQUINOX") + 1)
-            warpedWcs = afwImage.makeWcs(swarpedMetadata)
-
-            afwWarpedImage = afwImage.ImageF(swarpedImage.getDimensions())
-            originalImage = originalExposure.getMaskedImage().getImage()
-            originalWcs = originalExposure.getWcs()
-            numGoodPix = afwMath.warpImage(afwWarpedImage, warpedWcs, originalImage,
-                                           originalWcs, warpingControl)
-            self.assertGreater(numGoodPix, 50)
-
-            afwWarpedImageArr = afwWarpedImage.getArray()
-            noDataMaskArr = np.isnan(afwWarpedImageArr)
-            if changeEquinox:
-                with self.assertRaises(AssertionError):
-                    self.assertImagesAlmostEqual(afwWarpedImage, swarpedImage,
-                                                 skipMask=noDataMaskArr, rtol=rtol, atol=atol)
-            else:
-                self.assertImagesAlmostEqual(afwWarpedImage, swarpedImage,
-                                             skipMask=noDataMaskArr, rtol=rtol, atol=atol)
-
-    @unittest.skipIf(afwdataDir is None, "afwdata not setup")
     def testTransformBasedWarp(self):
         """Test warping using Transform<Point2Endpoint, Point2Endpoint>
         """
@@ -480,8 +430,7 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
             pixelScale=afwGeom.Angle(1.0e-8, afwGeom.degrees),
             projection="TAN",
             crPixPos=(0, 0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(359, 0), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(359 * afwGeom.degrees, 0 * afwGeom.degrees),
         )
         fromExp = afwImage.ExposureF(afwImage.MaskedImageF(10, 10), fromWcs)
 
@@ -489,8 +438,7 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
             pixelScale=afwGeom.Angle(0.00011, afwGeom.degrees),
             projection="CEA",
             crPixPos=(410000.0, 11441.0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(45, 0), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(45 * afwGeom.degrees, 0 * afwGeom.degrees),
             doFlipX=True,
         )
         toExp = afwImage.ExposureF(afwImage.MaskedImageF(0, 0), toWcs)
@@ -527,8 +475,7 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
             pixelScale=afwGeom.Angle(1.0e-8, afwGeom.degrees),
             projection="TAN",
             crPixPos=(0, 0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(359, 0), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(359 * afwGeom.degrees, 0 * afwGeom.degrees),
         )
         fromExp = afwImage.ExposureF(afwImage.MaskedImageF(1, 1), fromWcs)
 
@@ -536,8 +483,7 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
             pixelScale=afwGeom.Angle(1.1e-8, afwGeom.degrees),
             projection="TAN",
             crPixPos=(0, 0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(358, 0), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(358 * afwGeom.degrees, 0 * afwGeom.degrees)
         )
         toExp = afwImage.ExposureF(afwImage.MaskedImageF(10, 10), toWcs)
 
@@ -570,14 +516,12 @@ class WarpExposureTestCase(lsst.utils.tests.TestCase):
         srcWcs = makeWcs(
             pixelScale=afwGeom.Angle(0.2, afwGeom.degrees),
             crPixPos=(10.0, 11.0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(41.7, 32.9), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(41.7 * afwGeom.degrees, 32.9 * afwGeom.degrees),
         )
         destWcs = makeWcs(
             pixelScale=afwGeom.Angle(0.17, afwGeom.degrees),
             crPixPos=(9.0, 10.0),
-            crValCoord=afwCoord.IcrsCoord(
-                afwGeom.Point2D(41.65, 32.95), afwGeom.degrees),
+            crValCoord=afwGeom.SpherePoint(41.65 * afwGeom.degrees, 32.95 * afwGeom.degrees),
             posAng=afwGeom.Angle(31, afwGeom.degrees),
         )
 

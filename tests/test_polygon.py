@@ -32,7 +32,6 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.coord as afwCoord
 from lsst.afw.geom.polygon import Polygon, SinglePolygonException
 
 DEBUG = False
@@ -275,7 +274,7 @@ class PolygonTest(lsst.utils.tests.TestCase):
                             afwGeom.Point2D(123.4, 567.8))
         poly1 = Polygon(box)
         scale = (0.2*afwGeom.arcseconds).asDegrees()
-        wcs = afwImage.makeWcs(afwCoord.Coord(0.0*afwGeom.degrees, 0.0*afwGeom.degrees),
+        wcs = afwImage.makeWcs(afwGeom.SpherePoint(0.0*afwGeom.degrees, 0.0*afwGeom.degrees),
                                afwGeom.Point2D(0.0, 0.0), scale, 0.0, 0.0, scale)
         transform = afwImage.XYTransformFromWcsPair(wcs, wcs)
         poly2 = Polygon(box, transform)

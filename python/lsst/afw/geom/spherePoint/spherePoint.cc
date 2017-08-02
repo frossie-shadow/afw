@@ -63,6 +63,9 @@ PYBIND11_PLUGIN(spherePoint) {
     /* Members */
     cls.def("getLongitude", &SpherePoint::getLongitude);
     cls.def("getLatitude", &SpherePoint::getLatitude);
+    cls.def("getRa", &SpherePoint::getRa);
+    cls.def("getDec", &SpherePoint::getDec);
+    cls.def("getPosition", &SpherePoint::getPosition, "units"_a = degrees);
     cls.def("getVector", &SpherePoint::getVector);
     cls.def("atPole", &SpherePoint::atPole);
     cls.def("isFinite", &SpherePoint::isFinite);

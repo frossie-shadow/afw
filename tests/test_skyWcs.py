@@ -4,8 +4,7 @@ import sys
 import unittest
 
 import lsst.utils.tests
-from lsst.afw.coord import IcrsCoord
-from lsst.afw.geom import SkyWcs, Extent2D, Point2D, degrees, \
+from lsst.afw.geom import SkyWcs, Extent2D, Point2D, SpherePoint, degrees, \
     arcseconds, radians, makeCdMatrix
 from lsst.afw.geom.testUtils import TransformTestBaseClass
 
@@ -18,11 +17,11 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
         TransformTestBaseClass.setUp(self)
         self.crpix = Point2D(100, 100)
         self.crvalList = [
-            IcrsCoord(0 * degrees, 45 * degrees),
-            IcrsCoord(0.00001 * degrees, 45 * degrees),
-            IcrsCoord(359.99999 * degrees, 45 * degrees),
-            IcrsCoord(30 * degrees, 89.99999 * degrees),
-            IcrsCoord(30 * degrees, -89.99999 * degrees),
+            SpherePoint(0 * degrees, 45 * degrees),
+            SpherePoint(0.00001 * degrees, 45 * degrees),
+            SpherePoint(359.99999 * degrees, 45 * degrees),
+            SpherePoint(30 * degrees, 89.99999 * degrees),
+            SpherePoint(30 * degrees, -89.99999 * degrees),
         ]
         self.orientationList = [
             0 * degrees,
@@ -40,7 +39,7 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
 
         Parameters
         ----------
-        crval : `lsst.afw.coord.IcrsCoord`
+        crval : `lsst.afw.coord.SpherePoint`
             Desired reference sky position.
             Must not be at either pole.
         orientation : `lsst.afw.geom.Angle`
@@ -65,14 +64,6 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
 
         xoffAng = 180*degrees if flipX else 0*degrees
 
-        def safeOffset(crval, direction, amount):
-            try:
-                offsetCoord = crval.toIcrs()
-                offsetCoord.offset(direction, amount)
-                return offsetCoord
-            except Exception:
-                return IcrsCoord(crval[0] + direction, crval - amount)
-
         pixelList = [
             Point2D(self.crpix[0], self.crpix[1]),
             Point2D(self.crpix[0] + 1, self.crpix[1]),
@@ -83,15 +74,15 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
         # check pixels to sky
         predSkyList = [
             crval,
-            safeOffset(crval, xoffAng - orientation, self.scale),
-            safeOffset(crval, 90*degrees - orientation, self.scale),
+            crval.offset(xoffAng - orientation, self.scale),
+            crval.offset(90*degrees - orientation, self.scale),
         ]
-        self.assertCoordListsAlmostEqual(predSkyList, skyList)
-        self.assertCoordListsAlmostEqual(predSkyList, wcs.pixelToSky(pixelList))
+        self.assertSpherePointListsAlmostEqual(predSkyList, skyList)
+        self.assertSpherePointListsAlmostEqual(predSkyList, wcs.pixelToSky(pixelList))
         for pixel, predSky in zip(pixelList, predSkyList):
-            self.assertCoordsAlmostEqual(predSky, wcs.pixelToSky(pixel))
+            self.assertSpherePointsAlmostEqual(predSky, wcs.pixelToSky(pixel))
             anglePair = wcs.pixelToSky(*pixel)
-            self.assertCoordsAlmostEqual(predSky, IcrsCoord(*anglePair))
+            self.assertSpherePointsAlmostEqual(predSky, SpherePoint(*anglePair))
 
         # check sky to pixels
         self.assertPairListsAlmostEqual(pixelList, wcs.applyInverse(skyList))
@@ -102,7 +93,7 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
             self.assertPairsAlmostEqual(pixel, Point2D(*xyPair))
 
         crval = wcs.getSkyOrigin()
-        self.assertCoordsAlmostEqual(crval, crval, maxDiff=self.tinyAngle)
+        self.assertSpherePointsAlmostEqual(crval, crval, maxSep=self.tinyAngle)
 
         crpix = wcs.getPixelOrigin()
         self.assertPairsAlmostEqual(crpix, self.crpix, maxDiff=self.tinyPixels)
@@ -119,11 +110,11 @@ class TanSkyWcsTestCase(TransformTestBaseClass):
         predShiftedPixelOrigin = self.crpix + offset
         self.assertPairsAlmostEqual(shiftedWcs.getPixelOrigin(), predShiftedPixelOrigin,
                                     maxDiff=self.tinyPixels)
-        self.assertCoordsAlmostEqual(shiftedWcs.getSkyOrigin(), crval, maxDiff=self.tinyAngle)
+        self.assertSpherePointsAlmostEqual(shiftedWcs.getSkyOrigin(), crval, maxSep=self.tinyAngle)
 
         shiftedPixelList = [p + offset for p in pixelList]
         shiftedSkyList = shiftedWcs.applyForward(shiftedPixelList)
-        self.assertCoordListsAlmostEqual(skyList, shiftedSkyList, maxDiff=self.tinyAngle)
+        self.assertSpherePointListsAlmostEqual(skyList, shiftedSkyList, maxSep=self.tinyAngle)
 
         return wcs
 

@@ -125,13 +125,13 @@ std::shared_ptr<Wcs> makeWcs(std::shared_ptr<daf::base::PropertySet> const& _met
     return wcs;
 }
 
-std::shared_ptr<Wcs> makeWcs(coord::Coord const& crval, geom::Point2D const& crpix, double CD11, double CD12,
-                             double CD21, double CD22) {
+std::shared_ptr<Wcs> makeWcs(geom::SpherePoint const& crval, geom::Point2D const& crpix, double CD11,
+                             double CD12, double CD21, double CD22) {
     Eigen::Matrix2d CD;
     CD << CD11, CD12, CD21, CD22;
     geom::Point2D crvalTmp;
-    crvalTmp[0] = crval.toIcrs().getLongitude().asDegrees();
-    crvalTmp[1] = crval.toIcrs().getLatitude().asDegrees();
+    crvalTmp[0] = crval.getLongitude().asDegrees();
+    crvalTmp[1] = crval.getLatitude().asDegrees();
     return std::shared_ptr<Wcs>(new TanWcs(crvalTmp, crpix, CD));
 }
 }

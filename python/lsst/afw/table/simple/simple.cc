@@ -22,7 +22,6 @@
 
 #include "pybind11/pybind11.h"
 
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/table/BaseRecord.h"
 #include "lsst/afw/table/BaseTable.h"
 #include "lsst/afw/table/Simple.h"
@@ -48,8 +47,7 @@ PySimpleRecord declareSimpleRecord(py::module &mod) {
     cls.def("getTable", &SimpleRecord::getTable);
     cls.def_property_readonly("table", &SimpleRecord::getTable);
     cls.def("getCoord", &SimpleRecord::getCoord);
-    cls.def("setCoord", (void (SimpleRecord::*)(IcrsCoord const &)) & SimpleRecord::setCoord);
-    cls.def("setCoord", (void (SimpleRecord::*)(Coord const &)) & SimpleRecord::setCoord);
+    cls.def("setCoord", &SimpleRecord::setCoord);
     cls.def("getRa", &SimpleRecord::getRa);
     cls.def("setRa", &SimpleRecord::setRa);
     cls.def("getDec", &SimpleRecord::getDec);

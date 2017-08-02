@@ -103,7 +103,7 @@ def _compareWcsOverBBox(wcs0, wcs1, bbox, maxDiffSky=0.01*afwGeom.arcseconds,
         fromPixPos = afwGeom.Point2D(x, y)
         sky0 = wcs0.pixelToSky(fromPixPos)
         sky1 = wcs1.pixelToSky(fromPixPos)
-        diffSky = sky0.angularSeparation(sky1)
+        diffSky = sky0.separation(sky1)
         if diffSky > measDiffSky[0]:
             measDiffSky = (diffSky, fromPixPos)
             if doShortCircuit:

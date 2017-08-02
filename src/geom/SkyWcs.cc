@@ -30,11 +30,11 @@
 #include "astshim.h"
 
 #include "lsst/afw/formatters/Utils.h"
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/detail/frameSetUtils.h"
 #include "lsst/afw/geom/detail/transformUtils.h"
 #include "lsst/afw/geom/Angle.h"
 #include "lsst/afw/geom/Point.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/SkyWcs.h"
 #include "lsst/daf/base/PropertyList.h"
 #include "lsst/pex/exceptions.h"
@@ -60,14 +60,14 @@ Eigen::Matrix2d makeCdMatrix(Angle const& scale, Angle const& orientation, bool 
     return cdMatrix;
 }
 
-SkyWcs::SkyWcs(Point2D const& crpix, coord::IcrsCoord const& crval, Eigen::Matrix2d const& cdMatrix)
+SkyWcs::SkyWcs(Point2D const& crpix, SpherePoint const& crval, Eigen::Matrix2d const& cdMatrix)
         : SkyWcs(detail::readLsstSkyWcs(*detail::makeTanWcsMetadata(crpix, crval, cdMatrix))) {}
 
 SkyWcs::SkyWcs(daf::base::PropertyList& metadata, bool strip)
         : SkyWcs(detail::readLsstSkyWcs(metadata, strip)) {}
 
 SkyWcs::SkyWcs(ast::FrameSet const& frameSet)
-        : Transform<Point2Endpoint, IcrsCoordEndpoint>(_checkFrameSet(frameSet)) {}
+        : Transform<Point2Endpoint, SpherePointEndpoint>(_checkFrameSet(frameSet)) {}
 
 Angle SkyWcs::getPixelScale(Point2D const& pixel) const {
     // Compute pixVec containing the pixel position of three corners of the pixel
@@ -101,11 +101,11 @@ Angle SkyWcs::getPixelScale() const { return getPixelScale(getPixelOrigin()); }
 
 Point2D SkyWcs::getPixelOrigin() const { return this->applyInverse(getSkyOrigin()); }
 
-coord::IcrsCoord SkyWcs::getSkyOrigin() const {
+SpherePoint SkyWcs::getSkyOrigin() const {
     // CRVAL is stored as the SkyRef property of the sky frame (the current frame of the SkyWcs)
     auto const skyFrame = detail::getSkyFrame(*getFrameSet(), ast::FrameSet::CURRENT, false);
     auto const crvalRad = skyFrame->getSkyRef();
-    return coord::IcrsCoord(crvalRad[0] * radians, crvalRad[1] * radians);
+    return SpherePoint(crvalRad[0] * radians, crvalRad[1] * radians);
 }
 
 Eigen::Matrix2d SkyWcs::getCdMatrix(Point2D const& pixel) const {
@@ -209,7 +209,7 @@ std::pair<Angle, Angle> SkyWcs::pixelToSky(double x, double y) const {
 Compute the pixel position from the sky position
 */
 std::pair<double, double> SkyWcs::skyToPixel(Angle const& ra, Angle const& dec) const {
-    auto pixel = applyInverse(coord::IcrsCoord(ra, dec));
+    auto pixel = applyInverse(SpherePoint(ra, dec));
     return std::pair<double, double>(pixel[0], pixel[1]);
 };
 
@@ -235,7 +235,7 @@ std::string SkyWcs::writeString() const {
 }
 
 SkyWcs::SkyWcs(std::shared_ptr<ast::FrameSet>&& frameSet)
-        : Transform<Point2Endpoint, IcrsCoordEndpoint>(std::move(frameSet)){};
+        : Transform<Point2Endpoint, SpherePointEndpoint>(std::move(frameSet)){};
 
 std::shared_ptr<ast::FrameSet> SkyWcs::_checkFrameSet(ast::FrameSet const& frameSet) const {
     // checking alters the frameSet current pointer, so use a copy

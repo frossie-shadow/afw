@@ -109,10 +109,9 @@ typedef PointKey<double> Point2DKey;
 /**
  *  A FunctorKey used to get or set celestial coordinates from a pair of Angle keys.
  *
- *  Coords are always stored and returned in the ICRS system. Coords in other
- *  systems may be assigned, but this will result in a conversion to ICRS.
+ *  Coords are always assumed to be stored and returned in the ICRS system.
  */
-class CoordKey : public FunctorKey<coord::IcrsCoord> {
+class CoordKey : public FunctorKey<geom::SpherePoint> {
 public:
     /**
      *  Add a pair of _ra, _dec fields to a Schema, and return a CoordKey that points to them.
@@ -141,13 +140,10 @@ public:
     CoordKey(SubSchema const& s) : _ra(s["ra"]), _dec(s["dec"]) {}
 
     /// Get an IcrsCoord from the given record
-    virtual coord::IcrsCoord get(BaseRecord const& record) const;
+    virtual geom::SpherePoint get(BaseRecord const& record) const;
 
     /// Set an IcrsCoord in the given record
-    virtual void set(BaseRecord& record, coord::IcrsCoord const& value) const;
-
-    /// Set a Coord of another type in the given record; must be convertable to ICRS
-    virtual void set(BaseRecord& record, coord::Coord const& value) const;
+    virtual void set(BaseRecord& record, geom::SpherePoint const& value) const;
 
     //@{
     /// Compare CoordKeys for equality using the constituent `ra` and `dec` Keys

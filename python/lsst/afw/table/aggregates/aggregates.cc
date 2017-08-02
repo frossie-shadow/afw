@@ -28,8 +28,8 @@
 
 #include "lsst/afw/geom/ellipses/Quadrupole.h"
 
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Angle.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/table/Key.h"
 #include "lsst/afw/table/Schema.h"
 #include "lsst/afw/table/BaseRecord.h"
@@ -91,9 +91,9 @@ static void declareCoordKey(py::module &mod) {
     cls.def("isValid", &CoordKey::isValid);
     cls.def("get", [](CoordKey &self, BaseRecord const &record) { return self.get(record); });
     cls.def("set",
-            (void (CoordKey::*)(BaseRecord & record, coord::IcrsCoord const &value) const) & CoordKey::set);
+            (void (CoordKey::*)(BaseRecord & record, geom::SpherePoint const &value) const) & CoordKey::set);
     cls.def("set",
-            (void (CoordKey::*)(BaseRecord & record, coord::Coord const &value) const) & CoordKey::set);
+            (void (CoordKey::*)(BaseRecord & record, geom::SpherePoint const &value) const) & CoordKey::set);
 }
 
 static void declareQuadrupoleKey(py::module &mod) {

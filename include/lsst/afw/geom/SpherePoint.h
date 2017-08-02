@@ -54,8 +54,6 @@ namespace geom {
  * of SpherePoints; no STL container has an atomic element-replacement method,
  * so complicated constructions would need to be used if you couldn't
  * overwrite an existing element.
- *
- * @see @ref coord::Coord
  */
 class SpherePoint final {
 public:
@@ -156,6 +154,9 @@ public:
      */
     Angle getLongitude() const noexcept { return _longitude * radians; };
 
+    /// Synonym for getLongitude
+    Angle getRa() const noexcept { return _longitude * radians; };
+
     /**
      * The latitude of this point.
      *
@@ -164,6 +165,18 @@ public:
      * @exceptsafe Shall not throw exceptions.
      */
     Angle getLatitude() const noexcept { return _latitude * radians; };
+
+    /// Synonym for getLatitude
+    Angle getDec() const noexcept { return _latitude * radians; };
+
+    /**
+     * Return longitude, latitude as a Point2D object
+     *
+     * @param[in] unit  Units of returned data. With one exception, `unit` applies to
+     *      both longitude and latitude; the exception is if `unit == hours` then
+     *      longitude is returned in hours and latitude is returned in degrees.
+     */
+    Point2D getPosition(AngleUnit unit = degrees) const;
 
     /**
      * A unit vector representation of this point.

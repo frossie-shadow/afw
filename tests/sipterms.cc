@@ -39,9 +39,9 @@ using namespace std;
 
 #include "lsst/afw/image/TanWcs.h"
 #include "lsst/afw/geom/Point.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/Angle.h"
 #include "lsst/afw/math/FunctionLibrary.h"
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/log/Log.h"
 
 namespace {
@@ -51,7 +51,6 @@ static LOG_LOGGER logger = LOG_GET("test_sipterms");
 namespace math = lsst::afw::math;
 namespace afwImg = lsst::afw::image;
 namespace afwGeom = lsst::afw::geom;
-namespace afwCoord = lsst::afw::coord;
 
 double calculateDistortion(Eigen::MatrixXd sip, double u, double v) {
     // Computes all terms in the matrix, which the sip standard tells you not to do.
@@ -89,11 +88,11 @@ void testSip(afwImg::TanWcs &linWcs, afwImg::TanWcs &sipWcs, Eigen::MatrixXd sip
             double x0 = xy[0];
             double y0 = xy[1];
 
-            afwCoord::Fk5Coord lin = linWcs.pixelToSky(x0 + u + distortX, y0 + v + distortY)->toFk5();
-            afwCoord::Fk5Coord sip = sipWcs.pixelToSky(x0 + u, y0 + v)->toFk5();
+            auto lin = linWcs.pixelToSky(x0 + u + distortX, y0 + v + distortY);
+            auto sip = sipWcs.pixelToSky(x0 + u, y0 + v);
 
-            BOOST_CHECK_CLOSE(lin.getRa().asDegrees(), sip.getRa().asDegrees(), 1e-7);
-            BOOST_CHECK_CLOSE(lin.getDec().asDegrees(), sip.getDec().asDegrees(), 1e-7);
+            BOOST_CHECK_CLOSE(lin->getRa().asDegrees(), sip->getRa().asDegrees(), 1e-7);
+            BOOST_CHECK_CLOSE(lin->getDec().asDegrees(), sip->getDec().asDegrees(), 1e-7);
 
             v += step;
         }
@@ -112,17 +111,17 @@ void testSipP(afwImg::TanWcs &linWcs, afwImg::TanWcs &sipWcs, Eigen::MatrixXd si
 
     afwGeom::Point2D xy0 = linWcs.getPixelOrigin();
 
-    afwCoord::Fk5Coord raDec0 = linWcs.getSkyOrigin()->toFk5();
-    double ra = raDec0.getRa().asDegrees() - range;
-    double raUpr = raDec0.getRa().asDegrees() + range;
+    auto raDec0 = linWcs.getSkyOrigin();
+    double ra = raDec0->getRa().asDegrees() - range;
+    double raUpr = raDec0->getRa().asDegrees() + range;
 
     while (ra <= raUpr) {
-        double dec = raDec0.getDec().asDegrees() - range;
-        double decUpr = raDec0.getDec().asDegrees() + range;
+        double dec = raDec0->getDec().asDegrees() - range;
+        double decUpr = raDec0->getDec().asDegrees() + range;
         while (dec <= decUpr) {
-            auto rd = afwCoord::makeCoord(afwCoord::FK5, ra * afwGeom::degrees, dec * afwGeom::degrees);
-            auto xy = linWcs.skyToPixel(*rd);
-            auto xySip = sipWcs.skyToPixel(*rd);
+            auto rd = afwGeom::SpherePoint(ra * afwGeom::degrees, dec * afwGeom::degrees);
+            auto xy = linWcs.skyToPixel(rd);
+            auto xySip = sipWcs.skyToPixel(rd);
 
             // Get pixel origin returns crpix in fits coords, so we convert to
             // lsst coords before using (hence the -1)
@@ -261,11 +260,11 @@ void createSipTests(afwImg::TanWcs &wcs1, afwImg::TanWcs &wcs2) {
     while (u <= range) {
         double v = -1 * range;
         while (v <= range) {
-            afwCoord::Fk5Coord pos1 = wcs1.pixelToSky(x0 + u, y0 + v)->toFk5();
-            afwCoord::Fk5Coord pos2 = wcs2.pixelToSky(x0 + u, y0 + v)->toFk5();
+            auto pos1 = wcs1.pixelToSky(x0 + u, y0 + v);
+            auto pos2 = wcs2.pixelToSky(x0 + u, y0 + v);
 
-            BOOST_CHECK_CLOSE(pos1.getRa().asDegrees(), pos2.getRa().asDegrees(), 1e-7);
-            BOOST_CHECK_CLOSE(pos1.getDec().asDegrees(), pos2.getDec().asDegrees(), 1e-7);
+            BOOST_CHECK_CLOSE(pos1->getRa().asDegrees(), pos2->getRa().asDegrees(), 1e-7);
+            BOOST_CHECK_CLOSE(pos1->getDec().asDegrees(), pos2->getDec().asDegrees(), 1e-7);
 
             v += step;
         }

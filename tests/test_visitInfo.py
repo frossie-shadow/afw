@@ -28,8 +28,8 @@ import collections
 import lsst.utils.tests
 import lsst.pex.exceptions
 from lsst.daf.base import DateTime, PropertySet, PropertyList
-from lsst.afw.geom import degrees
-from lsst.afw.coord import IcrsCoord, Coord, Observatory, Weather
+from lsst.afw.geom import degrees, SpherePoint
+from lsst.afw.coord import Observatory, Weather
 import lsst.afw.image as afwImage
 
 RotTypeEnumNameDict = {
@@ -82,9 +82,9 @@ class VisitInfoTestCase(unittest.TestCase):
                                   65321.1, DateTime.MJD, DateTime.TAI),
                               ut1=12345.1,
                               era=45.1*degrees,
-                              boresightRaDec=IcrsCoord(
+                              boresightRaDec=SpherePoint(
                                   23.1*degrees, 73.2*degrees),
-                              boresightAzAlt=Coord(
+                              boresightAzAlt=SpherePoint(
                                   134.5*degrees, 33.3*degrees),
                               boresightAirmass=1.73,
                               boresightRotAngle=73.2*degrees,
@@ -102,9 +102,10 @@ class VisitInfoTestCase(unittest.TestCase):
                                   55321.2, DateTime.MJD, DateTime.TAI),
                               ut1=312345.1,
                               era=25.1*degrees,
-                              boresightRaDec=IcrsCoord(
+                              boresightRaDec=SpherePoint(
                                   2.1*degrees, 33.2*degrees),
-                              boresightAzAlt=Coord(13.5*degrees, 83.3*degrees),
+                              boresightAzAlt=SpherePoint(
+                                  13.5*degrees, 83.3*degrees),
                               boresightAirmass=2.05,
                               boresightRotAngle=-53.2*degrees,
                               rotType=afwImage.RotType.HORIZON,

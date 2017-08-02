@@ -28,7 +28,6 @@ from builtins import str
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
-import lsst.afw.coord as afwCoord
 import lsst.daf.base as dafBase
 import lsst
 
@@ -93,8 +92,8 @@ class MakeWcsTestCase(unittest.TestCase):
         """Verify that we can make a Wcs by providing the CD matrix elements in python."""
 
         m = self.metadata
-        crval = afwCoord.makeCoord(afwCoord.ICRS, m.getDouble("CRVAL1") *
-                                   afwGeom.degrees, m.getDouble("CRVAL2") * afwGeom.degrees)
+        crval = afwGeom.SpherePoint(m.getDouble("CRVAL1") * afwGeom.degrees,
+                                    m.getDouble("CRVAL2") * afwGeom.degrees)
         crpix = afwGeom.Point2D(m.getDouble("CRPIX1"), m.getDouble("CRPIX2"))
         cd11, cd12 = m.getDouble("CD1_1"), m.getDouble("CD1_2")
         cd21, cd22 = m.getDouble("CD2_1"), m.getDouble("CD2_2")

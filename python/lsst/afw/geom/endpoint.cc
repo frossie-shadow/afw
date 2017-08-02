@@ -29,8 +29,8 @@
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
 
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Point.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/Endpoint.h"
 
 namespace py = pybind11;
@@ -45,7 +45,7 @@ namespace {
 Add `__str__`, `__repr__` and `getClassPrefix` methods to an Endpoint pybind11 wrapper
 
 str(self) = "GenericEndpoint(_nAxes_)" for GenericEndpoint, e.g. "GenericEndpoint(4)";
-            "_typeName_()" for all other Endpoint classes, e.g. "IcrsCoordEndpoint()",
+            "_typeName_()" for all other Endpoint classes, e.g. "SpherePointEndpoint()",
 repr(self) = "lsst.afw.geom." + str(self), e.g. "lsst.afw.geom.GenericEndpoint(4)"
 */
 template <typename PyClass>
@@ -109,7 +109,7 @@ template <typename SelfClass, typename PyClass>
 void addAllEquals(PyClass& cls) {
     addEquals<SelfClass, GenericEndpoint>(cls);
     addEquals<SelfClass, Point2Endpoint>(cls);
-    addEquals<SelfClass, IcrsCoordEndpoint>(cls);
+    addEquals<SelfClass, SpherePointEndpoint>(cls);
 }
 
 /*
@@ -178,14 +178,14 @@ void declarePoint2Endpoint(py::module& mod) {
     addStrAndRepr(cls);
 }
 
-/// @internal declare IcrsCoordEndpoint and all subclasses
-void declareIcrsCoordEndpoint(py::module& mod) {
-    using Class = IcrsCoordEndpoint;
+/// @internal declare SpherePointEndpoint and all subclasses
+void declareSpherePointEndpoint(py::module& mod) {
+    using Class = SpherePointEndpoint;
     using Point = typename Class::Point;
 
-    declareBaseVectorEndpoint<Point>(mod, "IcrsCoord");
+    declareBaseVectorEndpoint<Point>(mod, "SpherePoint");
 
-    py::class_<Class, std::shared_ptr<Class>, BaseVectorEndpoint<Point>> cls(mod, "IcrsCoordEndpoint");
+    py::class_<Class, std::shared_ptr<Class>, BaseVectorEndpoint<Point>> cls(mod, "SpherePointEndpoint");
 
     cls.def(py::init<>());
     // do not wrap the constructor that takes nAxes; it is an implementation detail
@@ -211,7 +211,7 @@ PYBIND11_PLUGIN(endpoint) {
 
     declareGenericEndpoint(mod);
     declarePoint2Endpoint(mod);
-    declareIcrsCoordEndpoint(mod);
+    declareSpherePointEndpoint(mod);
 
     return mod.ptr();
 }

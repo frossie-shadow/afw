@@ -24,6 +24,7 @@
 #define AFW_TABLE_Exposure_h_INCLUDED
 
 #include "lsst/afw/geom/Box.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/table/BaseRecord.h"
 #include "lsst/afw/table/BaseTable.h"
 #include "lsst/afw/table/SortedCatalog.h"
@@ -96,7 +97,7 @@ public:
      *
      *  @throws pex::exceptions::LogicError if the ExposureRecord has no Wcs.
      */
-    bool contains(Coord const& coord, bool includeValidPolygon = false) const;
+    bool contains(geom::SpherePoint const& coord, bool includeValidPolygon = false) const;
 
     /**
      *  @brief Return true if the bounding box contains the given point, taking into account its Wcs
@@ -411,7 +412,7 @@ public:
      *
      *  @see ExposureRecord::contains
      */
-    ExposureCatalogT subsetContaining(Coord const& coord, bool includeValidPolygon = false) const;
+    ExposureCatalogT subsetContaining(geom::SpherePoint const& coord, bool includeValidPolygon = false) const;
 
     /**
      *  Return a shallow subset of the catalog with only those records that contain the given point.

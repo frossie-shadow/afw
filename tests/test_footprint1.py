@@ -47,7 +47,6 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.geom.ellipses as afwGeomEllipses
-import lsst.afw.coord as afwCoord
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDetect
@@ -713,7 +712,7 @@ class FootprintTestCase(lsst.utils.tests.TestCase):
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), dims)
         radius = 5
         offset = afwGeom.Extent2D(123, 456)
-        crval = afwCoord.Coord(0*afwGeom.degrees, 0*afwGeom.degrees)
+        crval = afwGeom.SpherePoint(0*afwGeom.degrees, 0*afwGeom.degrees)
         crpix = afwGeom.Point2D(0, 0)
         cdMatrix = [1.0e-5, 0.0, 0.0, 1.0e-5]
         source = afwImage.makeWcs(crval, crpix, *cdMatrix)

@@ -30,8 +30,8 @@
 #include "astshim.h"
 #include "ndarray.h"
 
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Endpoint.h"
+#include "lsst/afw/geom/SpherePoint.h"
 #include "lsst/afw/geom/Transform.h"
 #include "lsst/daf/base/PropertyList.h"
 
@@ -57,12 +57,12 @@ Make FITS metadata for a pure tangent WCS
 
 @param[in] crpix  Center of projection on the CCD using the LSST convention:
                         0, 0 is the lower left pixel of the image
-@param[in] crval  Center of projection on the sky
+@param[in] crval  Center of projection on the sky; an ICRS RA, Dec
 @param[in] cdMatrix  CD matrix where element (i-1, j-1) corresponds to FITS keyword CDi_j
                         and i, j have range [1, 2]
 */
 std::shared_ptr<daf::base::PropertyList> makeTanWcsMetadata(Point2D const& crpix,
-                                                            coord::IcrsCoord const& crval,
+                                                            geom::SpherePoint const& crval,
                                                             Eigen::Matrix2d const& cdMatrix);
 
 /**

@@ -35,7 +35,6 @@
 #include "lsst/afw/table/io/OutputArchive.h"
 #include "lsst/afw/table/io/InputArchive.h"
 #include "lsst/afw/table/io/CatalogVector.h"  // needed, but why?
-#include "lsst/afw/coord/Coord.h"
 #include "lsst/afw/geom/Angle.h"
 #include "lsst/afw/image/VisitInfo.h"
 
@@ -195,7 +194,7 @@ private:
               era(schema.addField<geom::Angle>("era", "earth rotation angle at middle of exposure", "")),
               boresightRaDec(table::CoordKey::addFields(schema, "boresightradec",
                                                         "sky position of boresight at middle of exposure")),
-              // CoordKey is only for IcrsCoord; we have no equivalent for other kinds of coordinates
+              // CoordKey is only for ICRS coordinates; we have no equivalent for other kinds of coordinates
               // so use a pair of Angle fields to save boresightAzAlt
               boresightAzAlt_az(schema.addField<geom::Angle>(
                       "boresightazalt_az",
@@ -235,7 +234,7 @@ public:
                 record.get(keys.exposureId), record.get(keys.exposureTime), record.get(keys.darkTime),
                 ::DateTime(record.get(keys.tai), ::DateTime::TAI), record.get(keys.ut1), record.get(keys.era),
                 record.get(keys.boresightRaDec),
-                coord::Coord(record.get(keys.boresightAzAlt_az), record.get(keys.boresightAzAlt_alt)),
+                geom::SpherePoint(record.get(keys.boresightAzAlt_az), record.get(keys.boresightAzAlt_alt)),
                 record.get(keys.boresightAirmass), record.get(keys.boresightRotAngle),
                 static_cast<RotType>(record.get(keys.rotType)),
                 coord::Observatory(record.get(keys.longitude), record.get(keys.latitude),
@@ -313,8 +312,8 @@ VisitInfo::VisitInfo(daf::base::PropertySet const& metadata)
           _date(),
           _ut1(getDouble(metadata, "MJD-AVG-UT1")),
           _era(getAngle(metadata, "AVG-ERA")),
-          _boresightRaDec(coord::IcrsCoord(getAngle(metadata, "BORE-RA"), getAngle(metadata, "BORE-DEC"))),
-          _boresightAzAlt(coord::Coord(getAngle(metadata, "BORE-AZ"), getAngle(metadata, "BORE-ALT"))),
+          _boresightRaDec(geom::SpherePoint(getAngle(metadata, "BORE-RA"), getAngle(metadata, "BORE-DEC"))),
+          _boresightAzAlt(geom::SpherePoint(getAngle(metadata, "BORE-AZ"), getAngle(metadata, "BORE-ALT"))),
           _boresightAirmass(getDouble(metadata, "BORE-AIRMASS")),
           _boresightRotAngle(getAngle(metadata, "BORE-ROTANG")),
           _rotType(RotType::UNKNOWN),

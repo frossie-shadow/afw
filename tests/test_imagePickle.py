@@ -28,7 +28,6 @@ from builtins import range
 import numpy as np
 
 import lsst.utils.tests
-import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 
@@ -93,7 +92,7 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
 
     def testMaskedImage(self):
         scale = (1.0*afwGeom.arcseconds).asDegrees()
-        wcs = afwImage.makeWcs(afwCoord.Coord(0.0*afwGeom.degrees, 0.0*afwGeom.degrees),
+        wcs = afwImage.makeWcs(afwGeom.SpherePoint(0.0*afwGeom.degrees, 0.0*afwGeom.degrees),
                                afwGeom.Point2D(0.0, 0.0), scale, 0.0, 0.0, scale)
         for MaskedImage in (afwImage.MaskedImageF,
                             afwImage.MaskedImageD,

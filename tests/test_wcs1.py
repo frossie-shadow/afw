@@ -128,14 +128,6 @@ def makeWcs(
     return afwImage.makeWcs(ps)
 
 
-def localMakeCoord(coordSys, posDeg, equinox):
-    """Make a coord, ignoring equinox if necessary
-    """
-    if coordSys in (afwCoord.ICRS, afwCoord.GALACTIC):
-        return afwCoord.makeCoord(coordSys, posDeg[0]*afwGeom.degrees, posDeg[1]*afwGeom.degrees)
-    return afwCoord.makeCoord(coordSys, posDeg[0]*afwGeom.degrees, posDeg[1]*afwGeom.degrees, equinox)
-
-
 class WcsTestCase(lsst.utils.tests.TestCase):
 
     def testCD_PC(self):
@@ -192,29 +184,6 @@ class WcsTestCase(lsst.utils.tests.TestCase):
             sky = wcs.pixelToSky(x, y)
             for i, v in enumerate([ra, dec]):
                 self.assertEqual(sky[i].asDegrees(), v)
-
-    def testCoordConversion(self):
-        """Test that skyToPixel and pixelToSky handle coordinate system and equinox correctly
-
-        Given two WCS that are identical except perhaps for coordinate system and equinox
-        compute: sky2 = wcs2.pixelToSky(wcs1.skyToPixel(sky1)
-        The result should be the same numerical values, but with wcs2's coordinate system and equinox
-        """
-        crValDeg = (27.53, 87.123)
-        for coordSys1, equinox1 in coordSysEquinoxIter():
-            wcs1 = makeWcs(crValDeg=crValDeg,
-                           coordSys=coordSys1, equinox=equinox1)
-            for coordSys2, equinox2 in coordSysEquinoxIter():
-                wcs2 = makeWcs(crValDeg=crValDeg,
-                               coordSys=coordSys2, equinox=equinox2)
-                for sky1Deg in (crValDeg, (18.52, 46.765)):
-                    coord1 = localMakeCoord(coordSys1, sky1Deg, equinox1)
-                    pixPos = wcs1.skyToPixel(coord1)
-                    coord2 = wcs2.pixelToSky(pixPos)
-
-                    desCoord2 = localMakeCoord(
-                        coordSys2, (coord1[0].asDegrees(), coord1[1].asDegrees()), equinox2)
-                    self.assertCoordsAlmostEqual(coord2, desCoord2)
 
     def testGetCoordSys(self):
         """Test getCoordSystem, getEquinox"""
@@ -276,7 +245,7 @@ class WCSRotateFlip(unittest.TestCase):
         del self.size
 
     def makeWcs(self):
-        crval = afwCoord.Coord(afwGeom.Point2D(1.606631, 5.090329))
+        crval = afwGeom.SpherePoint(1.606631 * afwGeom.degrees, 5.090329 * afwGeom.degrees)
         crpix = afwGeom.Point2D(2036., 2000.)
         return afwImage.makeWcs(crval, crpix, 5.399452e-5, -1.30770e-5, 1.30770e-5, 5.399452e-5)
 
@@ -350,8 +319,8 @@ class WCSTestCaseSDSS(unittest.TestCase):
         self.assertAlmostEqual(xy.getX(), xy2.getX())
         self.assertAlmostEqual(xy.getY(), xy2.getY())
 
-        raDec = afwCoord.makeCoord(
-            afwCoord.ICRS, 245.167400 * afwGeom.degrees, +19.1976583 * afwGeom.degrees)
+        raDec = afwGeom.SpherePoint(245.167400 * afwGeom.degrees,
+                                    +19.1976583 * afwGeom.degrees)
 
         xy = self.wcs.skyToPixel(raDec)
         raDec2 = self.wcs.pixelToSky(xy)
@@ -372,8 +341,7 @@ class WCSTestCaseSDSS(unittest.TestCase):
     @unittest.skipIf(afwdataDir is None, "afwdata not setup")
     def testIdentity(self):
         """Convert from ra, dec to col, row and back again"""
-        raDec = afwCoord.makeCoord(
-            afwCoord.ICRS, 244 * afwGeom.degrees, 20 * afwGeom.degrees)
+        raDec = afwGeom.SpherePoint(244 * afwGeom.degrees, 20 * afwGeom.degrees)
         if verbose:
             print('testIdentity')
             print('wcs:')
@@ -399,8 +367,7 @@ class WCSTestCaseSDSS(unittest.TestCase):
     def testInvalidRaDec(self):
         """Test a conversion for an invalid position.  Well, "test" isn't
         quite right as the result is invalid, but make sure that it still is"""
-        raDec = afwCoord.makeCoord(
-            afwCoord.ICRS, 1 * afwGeom.degrees, 2 * afwGeom.degrees)
+        raDec = afwGeom.SpherePoint(1 * afwGeom.degrees, 2 * afwGeom.degrees)
 
         with self.assertRaises(lsst.pex.exceptions.Exception):
             self.wcs.skyToPixel(raDec)
@@ -537,17 +504,13 @@ class WCSTestCaseCFHT(unittest.TestCase):
         cosdec = math.cos(sky00[1])
 
         side = 1e-3
-        icrs = afwCoord.ICRS
-        sky10 = afwCoord.makeCoord(
-            icrs,
-            sky00.getPosition(afwGeom.degrees) + afwGeom.Extent2D(side/cosdec, 0),
-            afwGeom.degrees
-        )
-        sky01 = afwCoord.makeCoord(
-            icrs,
-            sky00.getPosition(afwGeom.degrees) + afwGeom.Extent2D(0, side),
-            afwGeom.degrees
-        )
+        pos10Deg = sky00.getPosition(afwGeom.degrees) + afwGeom.Extent2D(side/cosdec, 0)
+        sky10 = afwGeom.SpherePoint(pos10Deg[0] * afwGeom.degrees,
+                                    pos10Deg[1] * afwGeom.degrees)
+
+        pos01Deg = sky00.getPosition(afwGeom.degrees) + afwGeom.Extent2D(0, side)
+        sky01 = afwGeom.SpherePoint(pos01Deg[0] * afwGeom.degrees,
+                                    pos01Deg[1] * afwGeom.degrees)
         p10 = self.wcs.skyToPixel(sky10) - p00
         p01 = self.wcs.skyToPixel(sky01) - p00
 
@@ -606,7 +569,8 @@ class WCSTestCaseCFHT(unittest.TestCase):
 
     def testAffineTransform(self):
         sky00g = afwGeom.Point2D(10, 10)
-        sky00c = afwCoord.makeCoord(afwCoord.ICRS, sky00g, afwGeom.degrees)
+        sky00c = afwGeom.SpherePoint(sky00g[0] * afwGeom.degrees,
+                                     sky00g[1] * afwGeom.degrees)
         a = self.wcs.linearizeSkyToPixel(sky00c)
         pix00g = self.wcs.skyToPixel(sky00c)
         pix00gApprox = a(sky00g)

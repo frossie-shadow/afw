@@ -38,7 +38,7 @@ namespace afw {
 namespace geom {
 
 /**
-Transform LSST spatial data, such as Point2D and IcrsCoord, using an AST transform.
+Transform LSST spatial data, such as Point2D and SpherePoint, using an AST transform.
 
 This class contains two Endpoints, to specify the "from" and "to" LSST data type,
 and an ast::FrameSet or ast::Mapping to specify the transformation.
@@ -224,7 +224,7 @@ public:
      * Used as the Python class name and for persistence as a string
      *
      * Returns "Transform" + fromEndpoint.getClassPrefix() + "To" + toEndpoint.getClassPrefix(),
-     * for example "TransformPoint2ToIcrsCoord" or "TransformPoint2ToGeneric".
+     * for example "TransformPoint2ToSpherePoint" or "TransformPoint2ToGeneric".
      */
     static std::string getShortClassName();
 
