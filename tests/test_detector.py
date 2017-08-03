@@ -67,11 +67,11 @@ class DetectorTestCase(lsst.utils.tests.TestCase):
         # make sure some complex objects stick around after detector is deleted
 
         detectorName = detector.getName()
+        nativeCoordSys = detector.getNativeCoordSys()
         offset = dw.orientation.getFpPosition()
         del detector
         del dw
         self.assertEquals(orientation.getFpPosition(), offset)
-        nativeCoordSys = transformMap.getNativeCoordSys()
         self.assertEquals(nativeCoordSys,
                           cameraGeom.CameraSys(cameraGeom.PIXELS.getSysName(), detectorName))
 
@@ -87,7 +87,7 @@ class DetectorTestCase(lsst.utils.tests.TestCase):
         def addBadCameraSys(dw):
             """Add an invalid camera system"""
             dw.transMap[cameraGeom.CameraSys("foo", "wrong detector")] = \
-                afwGeom.IdentityXYTransform()
+                afwGeom.makeIdentityTransform()
         with self.assertRaises(lsst.pex.exceptions.Exception):
             DetectorWrapper(modFunc=addBadCameraSys)
 
