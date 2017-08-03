@@ -190,6 +190,8 @@ struct FitsBitPix<double> {
     static int const CONSTANT = DOUBLE_IMG;
 };
 
+static bool allowImageCompression = true;
+
 }  // anonymous
 
 // ----------------------------------------------------------------------------------------------------------
@@ -960,6 +962,7 @@ void Fits::writeImageImpl(
 
 template <typename T>
 void Fits::readImageImpl(int nAxis, T *data, long *begin, long *end, long *increment) {
+    checkCompressedImagePhu();
     fits_read_subset(reinterpret_cast<fitsfile *>(fptr), FitsType<T>::CONSTANT, begin, end, increment, 0,
                      data, 0, &status);
     if (behavior & AUTO_CHECK) LSST_FITS_CHECK_STATUS(*this, "Reading image");
@@ -1012,15 +1015,19 @@ ImageCompressionOptions Fits::getImageCompression(int nDim)
 void Fits::setImageCompression(ImageCompressionOptions const& comp)
 {
     auto fits = reinterpret_cast<fitsfile *>(fptr);
-    fits_set_compression_type(fits, compressionSchemeToCfitsio(comp.scheme), &status);
+    ImageCompressionOptions::CompressionScheme const scheme = allowImageCompression ? comp.scheme :
+        ImageCompressionOptions::NONE;
+    fits_set_compression_type(fits, compressionSchemeToCfitsio(scheme), &status);
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Setting compression type");
     }
 
-    if (comp.scheme == ImageCompressionOptions::NONE) {
+#if 1
+    if (scheme == ImageCompressionOptions::NONE) {
         // Nothing else worth doing
         return;
     }
+#endif
 
     fits_set_tile_dim(fits, comp.tiles.getNumElements(), comp.tiles.getData(), &status);
     if (behavior & AUTO_CHECK) {
@@ -1033,6 +1040,14 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
             LSST_FITS_CHECK_STATUS(*this, "Setting quantization level");
         }
     }
+}
+
+void setAllowImageCompression(bool allow) {
+    allowImageCompression = allow;
+}
+
+bool getAllowImageCompression() {
+    return allowImageCompression;
 }
 
 // ---- Manipulating files ----------------------------------------------------------------------------------

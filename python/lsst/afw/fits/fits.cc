@@ -96,6 +96,8 @@ void defineFits(py::module & mod) {
             "strip"_a=false);
     cls.def("createEmpty", &Fits::createEmpty);
 
+    cls.def("gotoFirstHdu", [](Fits & self) { self.setHdu(INT_MIN); });
+
     cls.def("setImageCompression", &Fits::setImageCompression);
     cls.def("getImageCompression", &Fits::getImageCompression);
     cls.def("checkCompressedImagePhu", &Fits::checkCompressedImagePhu);
@@ -145,6 +147,8 @@ PYBIND11_PLUGIN(_fits) {
             [](std::string const& filename, int hdu=INT_MIN, bool strip=false) {
                 return readMetadata(filename, hdu, strip);
             }, "fileName"_a, "hdu"_a=INT_MIN, "strip"_a=false);
+    mod.def("setAllowImageCompression", &setAllowImageCompression, "allow"_a);
+    mod.def("getAllowImageCompression", &getAllowImageCompression);
 
     return mod.ptr();
 }

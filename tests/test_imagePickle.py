@@ -101,17 +101,7 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
                             afwImage.MaskedImageD,
                             ):
             image = self.createMaskedImage(MaskedImage)
-
-
-            pp = image.__reduce__()
-            open("foo.fits", "w").write(pp[1][1])
-            import pyfits
-            ff = pyfits.open("foo.fits")
-            print(ff[2].data)
-            import pdb;pdb.set_trace()
-
-
-
+#            import pdb;pdb.set_trace()
             self.checkImages(image)
             exposure = afwImage.makeExposure(image, wcs)
             self.checkExposures(exposure)

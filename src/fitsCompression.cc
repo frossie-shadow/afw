@@ -72,4 +72,14 @@ int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme
     }
 }
 
+
+ImageCompressionOptions::ImageCompressionOptions(
+    ImageCompressionOptions::CompressionScheme scheme_,
+    int quantizeLevel_
+) : scheme(scheme_), quantizeLevel(quantizeLevel_) {
+    tiles = ndarray::allocate(MAX_COMPRESS_DIM);
+    tiles[0] = 1;
+    for (int ii = 1; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = 1;
+}
+
 }}} // namespace lsst::afw::fits

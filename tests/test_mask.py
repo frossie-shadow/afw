@@ -44,6 +44,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.display.ds9 as ds9
 
+
 try:
     type(display)
 except NameError:
@@ -250,13 +251,14 @@ class MaskTestCase(utilsTests.TestCase):
 
         self.assertMasksEqual(mask, self.expect << nMaskPlanes0)
 
+        mask.clearMaskPlaneDict()
+
         with utilsTests.getTempFilePath(".fits") as tmpFile:
             mask.writeFits(tmpFile)
 
             # Read it back
             md = lsst.daf.base.PropertySet()
             rmask = self.Mask(tmpFile, 0, md)
-
             self.assertMasksEqual(mask, rmask)
 
             # Check that we wrote (and read) the metadata successfully

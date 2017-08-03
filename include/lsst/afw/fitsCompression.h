@@ -39,27 +39,47 @@ struct ImageCompressionOptions {
     Tiles tiles;           ///< tile size
     float quantizeLevel;   ///< quantization level: 0.0 = none
 
+    /// Custom compression
     explicit ImageCompressionOptions(
         CompressionScheme scheme_,
         Tiles tiles_,
         int quantizeLevel_=0.0
     ) : scheme(scheme_), tiles(tiles_), quantizeLevel(quantizeLevel_) {}
 
+    /// Compression by rows
+    explicit ImageCompressionOptions(
+        CompressionScheme scheme_,
+        int quantizeLevel_=0.0
+    );
+
+    /// Full image compression
+    ImageCompressionOptions(
+        CompressionScheme scheme_,
+        geom::Extent2I const& dims,
+        int quantizeLevel_=0.0
+    ) : scheme(scheme_), quantizeLevel(quantizeLevel_) {
+        tiles = ndarray::allocate(2);
+        tiles.asEigen() = dims.asEigen().template cast<long>();
+    }
+
     /// Default compression for a particular style of image
     template <typename T>
-    explicit ImageCompressionOptions(image::Image<T> const& image)
-        : scheme(image.getBBox().getArea() > 0 ? GZIP : NONE),
-          quantizeLevel(0.0) {
-        tiles = ndarray::allocate(2);
-        tiles.asEigen() = image.getDimensions().asEigen().template cast<long>();
-    }
+    explicit ImageCompressionOptions(image::Image<T> const& image) :
+        ImageCompressionOptions(image.getBBox().getArea() > 0 ? GZIP : NONE, 0.0) {}
     template <typename T>
-    explicit ImageCompressionOptions(image::Mask<T> const& mask)
-        : scheme(mask.getBBox().getArea() > 0 ? GZIP : NONE),
-          quantizeLevel(std::numeric_limits<float>::quiet_NaN()) {
-        tiles = ndarray::allocate(2);
-        tiles.asEigen() = mask.getDimensions().asEigen().template cast<long>();
-    }
+    explicit ImageCompressionOptions(image::Mask<T> const& mask) :
+        ImageCompressionOptions(mask.getBBox().getArea() > 0 ? GZIP : NONE, 0.0) {}
+
+    /// Disable compression for int64: cfitsio won't compress them
+    explicit ImageCompressionOptions(image::Image<std::int64_t> const& image) :
+        ImageCompressionOptions(NONE, 0.0) {}
+    explicit ImageCompressionOptions(image::Mask<std::int64_t> const& mask) :
+        ImageCompressionOptions(NONE, 0.0) {}
+    explicit ImageCompressionOptions(image::Image<std::uint64_t> const& image) :
+        ImageCompressionOptions(NONE, 0.0) {}
+    explicit ImageCompressionOptions(image::Mask<std::uint64_t> const& mask) :
+        ImageCompressionOptions(NONE, 0.0) {}
+
 };
 
 ImageCompressionOptions::CompressionScheme compressionSchemeFromString(std::string const& name);
