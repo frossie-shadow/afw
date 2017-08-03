@@ -87,6 +87,74 @@ std::string compressionSchemeToString(ImageCompressionOptions::CompressionScheme
 ImageCompressionOptions::CompressionScheme compressionSchemeFromCfitsio(int cfitsio);
 int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme);
 
+
+class ImageScale {
+  public:
+
+    int bitpix;
+    double bscale;
+    double bzero;
+
+    ImageScale(int bitpix_, double bscale_, double bzero_) :
+      bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
+
+    template <typename DiskT, typename MemT>
+    image::Image<DiskT> toDisk(image::Image<MemT> const& image, bool fuzz, unsigned long seed);
+
+    template <typename MemT, typename DiskT>
+    image::Image<MemT> fromDisk(image::Image<DiskT> const& image);
+};
+
+class ImageScalingOptions {
+  public:
+    enum ScalingScheme {
+        NONE,
+        RANGE,
+        STDEV_POSITIVE,
+        STDEV_NEGATIVE,
+        STDEV_BOTH,
+        MANUAL,
+    };
+    ScalingScheme scheme;
+    int bitpix;
+    bool fuzz;                          ///< Fuzz the values when quantising floating-point values?
+    unsigned long seed;
+    double bscale, bzero;               ///< Manually specified BSCALE and BZERO (for SCALE_MANUAL)
+    float quantizeLevel;
+    float quantizePad;                     ///< Number of standard deviations to pad off the edge
+    std::vector<std::string> maskPlanes;
+
+    template <typename T>
+    ImageScale determine(
+        image::Image<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
+    );
+
+    template <typename T, typename U>
+    image::Image<T> apply(
+        image::Image<U> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
+    ) {
+        return determine(image, mask).toDisk(image, fuzz, seed);
+    }
+
+  private:
+    template <typename T>
+    ImageScale determineFromRange(
+        image::Image<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel>> mask
+    );
+    template <typename T>
+    ImageScale determineFromStdev(
+        image::Image<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel>> mask
+    );
+
+};
+
+ImageScalingOptions::ScalingScheme scalingSchemeFromString(std::string const& name);
+std::string scalingSchemeToString(ImageScalingOptions::ScalingScheme scheme);
+
 }}} // namespace lsst::afw::fits
 
 #endif // ifndef LSST_AFW_fitsCompression_h_INCLUDED
