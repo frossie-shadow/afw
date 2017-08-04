@@ -90,7 +90,6 @@ int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme
 
 class ImageScale {
   public:
-
     int bitpix;
     double bscale;
     double bzero;
@@ -104,6 +103,7 @@ class ImageScale {
     template <typename MemT, typename DiskT>
     image::Image<MemT> fromDisk(image::Image<DiskT> const& image);
 };
+
 
 class ImageScalingOptions {
   public:
@@ -119,10 +119,23 @@ class ImageScalingOptions {
     int bitpix;
     bool fuzz;                          ///< Fuzz the values when quantising floating-point values?
     unsigned long seed;
-    double bscale, bzero;               ///< Manually specified BSCALE and BZERO (for SCALE_MANUAL)
+    std::vector<std::string> maskPlanes;
     float quantizeLevel;
     float quantizePad;                     ///< Number of standard deviations to pad off the edge
-    std::vector<std::string> maskPlanes;
+    double bscale, bzero;               ///< Manually specified BSCALE and BZERO (for SCALE_MANUAL)
+
+    ImageScalingOptions(
+        ScalingScheme scheme_,
+        int bitpix_,
+        std::vector<std::string> const& maskPlanes_,
+        unsigned long seed_,
+        float quantizeLevel_=4.0,
+        float quantizePad_=5.0,
+        bool fuzz_=true,
+        double bscale_=1.0,
+        double bzero_=0.0
+    ) : scheme(scheme_), bitpix(bitpix_), fuzz(fuzz_), seed(seed_), maskPlanes(maskPlanes_),
+        quantizeLevel(quantizeLevel_), quantizePad(quantizePad_), bscale(bscale_), bzero(bzero_) {}
 
     template <typename T>
     ImageScale determine(
@@ -130,12 +143,12 @@ class ImageScalingOptions {
         std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
     );
 
-    template <typename T, typename U>
-    image::Image<T> apply(
-        image::Image<U> const& image,
+    template <typename DiskT, typename MemT>
+    image::Image<DiskT> apply(
+        image::Image<MemT> const& image,
         std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
     ) {
-        return determine(image, mask).toDisk(image, fuzz, seed);
+        return determine(image, mask).template toDisk<DiskT>(image, fuzz, seed);
     }
 
   private:

@@ -207,6 +207,12 @@ ImageScale ImageScalingOptions::determine(
 
 template <typename DiskT, typename MemT>
 image::Image<DiskT> ImageScale::toDisk(image::Image<MemT> const& image, bool fuzz, unsigned long seed) {
+    // Having the user choose the right template is simpler than boost::mpl::for_each
+    if (FitsBitPix<DiskT>::CONSTANT != bitpix) {
+        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
+                          "Output type doesn't match bitpix");
+    }
+
     if (bscale == 1.0 && bzero == 0.0 && !fuzz) {
         return image::Image<DiskT>(image, true);
     }
@@ -256,7 +262,9 @@ image::Image<MemT> ImageScale::fromDisk(image::Image<DiskT> const& image) {
 #define INSTANTIATE2(MEMTYPE, DISKTYPE) \
 template image::Image<DISKTYPE> ImageScale::toDisk<DISKTYPE, MEMTYPE>( \
     image::Image<MEMTYPE> const&, bool, unsigned long); \
-template image::Image<MEMTYPE> ImageScale::fromDisk<MEMTYPE, DISKTYPE>(image::Image<DISKTYPE> const&);
+template image::Image<MEMTYPE> ImageScale::fromDisk<MEMTYPE, DISKTYPE>(image::Image<DISKTYPE> const&); \
+template image::Image<DISKTYPE> ImageScalingOptions::apply<DISKTYPE, MEMTYPE>( \
+    image::Image<MEMTYPE> const&, std::shared_ptr<image::Mask<image::MaskPixel>>);
 
 #define INSTANTIATE1(MEMTYPE) \
 template ImageScale ImageScalingOptions::determine<MEMTYPE>( \
