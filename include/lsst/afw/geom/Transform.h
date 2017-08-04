@@ -282,6 +282,11 @@ for example "Transform<GenericEndpoint(4), Point2Endpoint()>"
 template <class FromEndpoint, class ToEndpoint>
 std::ostream &operator<<(std::ostream &os, Transform<FromEndpoint, ToEndpoint> const &transform);
 
+/// Names for common types transforms; these names match the Python class names
+using TransformPoint2ToPoint2 = Transform<Point2Endpoint, Point2Endpoint>;
+using TransformPoint2ToGeneric = Transform<Point2Endpoint, GenericEndpoint>;
+using TransformPoint2ToIcrsCoord = Transform<Point2Endpoint, IcrsCoordEndpoint>;
+
 }  // namespace geom
 }  // namespace afw
 }  // namespace lsst
