@@ -98,13 +98,18 @@ class ImageScale {
       bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
 
     template <typename DiskT, typename MemT>
-    image::Image<DiskT> toDisk(image::Image<MemT> const& image, bool fuzz, unsigned long seed);
+    ndarray::Array<DiskT, 2, 2> toDisk(
+        ndarray::Array<MemT const, 2, 2> const& image,
+        bool fuzz,
+        unsigned long seed
+    );
 
     template <typename MemT, typename DiskT>
-    image::Image<MemT> fromDisk(image::Image<DiskT> const& image);
+    ndarray::Array<MemT, 2, 2> fromDisk(ndarray::Array<DiskT const, 2, 2> const& image);
 };
 
 
+// value in memory = BZERO + BSCALE * value on disk
 class ImageScalingOptions {
   public:
     enum ScalingScheme {
@@ -141,26 +146,52 @@ class ImageScalingOptions {
     ImageScale determine(
         image::Image<T> const& image,
         std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
-    );
+    ) {
+        auto const arrays = _toArray(image, mask);
+        return determineImpl(arrays.first, arrays.second);
+    }
 
     template <typename DiskT, typename MemT>
-    image::Image<DiskT> apply(
+    ndarray::Array<DiskT, 2, 2> apply(
         image::Image<MemT> const& image,
         std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
     ) {
-        return determine(image, mask).template toDisk<DiskT>(image, fuzz, seed);
+        auto const arrays = _toArray(image, mask);
+        return determineImpl(arrays.first, arrays.second).template toDisk<DiskT>(arrays.first, fuzz, seed);
     }
 
   private:
     template <typename T>
-    ImageScale determineFromRange(
+    std::pair<ndarray::Array<T const, 2, 2>, ndarray::Array<bool const, 2, 2>> _toArray(
         image::Image<T> const& image,
-        std::shared_ptr<image::Mask<image::MaskPixel>> mask
+        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
+    ) {
+        ndarray::Array<T const, 2, 2> imageArray = ndarray::dynamic_dimension_cast<2>(image.getArray());
+        if (imageArray.empty()) imageArray = ndarray::copy(image.getArray());
+        ndarray::Array<bool, 2, 2> maskArray = ndarray::allocate(imageArray.getShape());
+        if (mask) {
+            maskArray.deep() = (mask->getArray() & mask->getPlaneBitMask(maskPlanes));
+        } else {
+            maskArray.deep() = false;
+        }
+        return std::make_pair(imageArray, maskArray);
+    }
+
+    template <typename T, int N>
+    ImageScale determineImpl(
+        ndarray::Array<T const, N, N> const& image,
+        ndarray::Array<bool const, N, N> const& mask
     );
-    template <typename T>
+
+    template <typename T, int N>
+    ImageScale determineFromRange(
+        ndarray::Array<T const, N, N> const& image,
+        ndarray::Array<bool const, N, N> const& mask
+    );
+    template <typename T, int N>
     ImageScale determineFromStdev(
-        image::Image<T> const& image,
-        std::shared_ptr<image::Mask<image::MaskPixel>> mask
+        ndarray::Array<T const, N, N> const& image,
+        ndarray::Array<bool const, N, N> const& mask
     );
 
 };

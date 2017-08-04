@@ -73,14 +73,13 @@ void defineImageCompression(py::module & mod) {
 }
 
 template <typename DiskT, typename MemT>
-void defineImageScalingOptionsTemplates2(py::class_ & cls, std::string const& suffix) {
-    cls.define("apply" + suffix, &ImageScaleOptions::apply<DiskT, MemT>);
+void defineImageScalingOptionsTemplates2(py::class_<ImageScalingOptions> & cls, std::string const& suffix) {
+    cls.def(("apply" + suffix).c_str(), &ImageScalingOptions::apply<DiskT, MemT>);
 }
 
 template <typename T>
-void defineImageScalingOptionsTemplates1(py::class_ & cls) {
+void defineImageScalingOptionsTemplates1(py::class_<ImageScalingOptions> & cls) {
     cls.def("determine", &ImageScalingOptions::determine<T>);
-    defineImageScalingOptionsTemplates2<std::uint8_t, T>(cls, "U8");
     defineImageScalingOptionsTemplates2<std::int16_t, T>(cls, "S16");
     defineImageScalingOptionsTemplates2<std::int32_t, T>(cls, "S32");
     defineImageScalingOptionsTemplates2<std::int64_t, T>(cls, "S64");
@@ -89,7 +88,7 @@ void defineImageScalingOptionsTemplates1(py::class_ & cls) {
 
 void defineImageScalingOptions(py::module & mod) {
     py::class_<ImageScalingOptions> cls(mod, "ImageScalingOptions");
-    py::enum_<ImageCompressionOptions::CompressionScheme> scheme(cls, "CompressionScheme");
+    py::enum_<ImageScalingOptions::ScalingScheme> scheme(cls, "CompressionScheme");
     scheme.value("NONE", ImageScalingOptions::ScalingScheme::NONE);
     scheme.value("RANGE", ImageScalingOptions::ScalingScheme::RANGE);
     scheme.value("STDEV_POSITIVE", ImageScalingOptions::ScalingScheme::STDEV_POSITIVE);
@@ -113,26 +112,23 @@ void defineImageScalingOptions(py::module & mod) {
     cls.def_readonly("bscale", &ImageScalingOptions::bscale);
     cls.def_readonly("bzero", &ImageScalingOptions::bzero);
 
-    defineImageScalingOptionsTemplates1<std::uint8_t>(cls);
-    defineImageScalingOptionsTemplates1<std::int16_t>(cls);
     defineImageScalingOptionsTemplates1<std::uint16_t>(cls);
     defineImageScalingOptionsTemplates1<std::int32_t>(cls);
-    defineImageScalingOptionsTemplates1<std::uint32_t>(cls);
     defineImageScalingOptionsTemplates1<std::uint64_t>(cls);
     defineImageScalingOptionsTemplates1<float>(cls);
     defineImageScalingOptionsTemplates1<double>(cls);
 }
 
 template <typename DiskT, typename MemT>
-void defineImageScaleTemplates2(py:class_ & cls, std::string const& diskSuffix,
+void defineImageScaleTemplates2(py::class_<ImageScale> & cls, std::string const& diskSuffix,
                                 std::string const & memSuffix) {
-    cls.def("toDisk" + diskSuffix, &ImageScale::toDisk<DiskT, MemT>, "image"_a, "fuzz"_a, "seed"_a=0);
-    cls.def("fromDisk" + memSuffix, &ImageScale::fromDisk<MemT, DiskT>);
+    cls.def(("toDisk" + diskSuffix).c_str(), &ImageScale::toDisk<DiskT, MemT>, "image"_a, "fuzz"_a,
+            "seed"_a=0);
+    cls.def(("fromDisk" + memSuffix).c_str(), &ImageScale::fromDisk<MemT, DiskT>);
 }
 
 template <typename MemT>
-void defineImageScaleTemplates1(py::class_ & cls, std::string const& suffix) {
-    defineImageScaleTemplates2<std::uint8_t, MemT>(cls, "U8", suffix);
+void defineImageScaleTemplates1(py::class_<ImageScale> & cls, std::string const& suffix) {
     defineImageScaleTemplates2<std::int16_t, MemT>(cls, "S16", suffix);
     defineImageScaleTemplates2<std::int32_t, MemT>(cls, "S32", suffix);
     defineImageScaleTemplates2<std::int64_t, MemT>(cls, "S64", suffix);
@@ -145,11 +141,8 @@ void defineImageScale(py::module & mod) {
     cls.def_readonly("bscale", &ImageScale::bscale);
     cls.def_readonly("bzero", &ImageScale::bzero);
 
-    defineImageScaleTemplates1<std::uint8_t>(cls, "U8");
-    defineImageScaleTemplates1<std::int16_t>(cls, "S16");
     defineImageScaleTemplates1<std::uint16_t>(cls, "U16");
     defineImageScaleTemplates1<std::int32_t>(cls, "S32");
-    defineImageScaleTemplates1<std::uint32_t>(cls, "U32");
     defineImageScaleTemplates1<std::uint64_t>(cls, "U64");
     defineImageScaleTemplates1<float>(cls, "F32");
     defineImageScaleTemplates1<double>(cls, "F64");
