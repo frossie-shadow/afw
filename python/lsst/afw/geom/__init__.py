@@ -45,3 +45,4 @@ from .transform import *
 from .transformFactory import *
 from .skyWcs import *
 from .transformFromString import *
+from .wcsUtils import *
