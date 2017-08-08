@@ -41,7 +41,7 @@ template <typename PixelT>
 inline void fits_read_array(fits::Fits& fitsfile, ndarray::Array<PixelT, 2, 2>& array, geom::Point2I& xy0,
                             lsst::daf::base::PropertySet& metadata, geom::Box2I bbox = geom::Box2I(),
                             ImageOrigin origin = PARENT) {
-    fitsfile.checkCompressedImagePhu();
+//    fitsfile.checkCompressedImagePhu();
     if (!fitsfile.checkImageType<PixelT>()) {
         throw LSST_FITS_EXCEPT(fits::FitsTypeError, fitsfile, "Incorrect image type for FITS image");
     }
@@ -97,10 +97,13 @@ inline void fits_read_array(fits::Fits& fitsfile, ndarray::Array<PixelT, 2, 2>& 
 }
 
 template <typename ImageT>
-inline void fits_write_image(fits::Fits& fitsfile, const ImageT& image,
-                             fits::ImageWriteOptions const& options,
-                             std::shared_ptr<daf::base::PropertySet const> metadata =
-                                     std::shared_ptr<daf::base::PropertySet const>()) {
+inline void fits_write_image(
+    fits::Fits& fitsfile,
+    ImageT const& image,
+    fits::ImageWriteOptions const& options,
+    std::shared_ptr<daf::base::PropertySet const> metadata=std::shared_ptr<daf::base::PropertySet const>(),
+    std::shared_ptr<Mask<MaskPixel> const> mask=std::shared_ptr<Mask<MaskPixel> const>()
+) {
 #if 0
     fitsfile.createImage<typename ImageT::Pixel>(image.getArray().getShape());
     if (metadata) {
@@ -110,8 +113,7 @@ inline void fits_write_image(fits::Fits& fitsfile, const ImageT& image,
 #else
     std::shared_ptr<daf::base::PropertyList const> header =
         std::static_pointer_cast<daf::base::PropertyList const>(metadata);
-    fitsfile.writeImage(image.getArray(), header ? header : std::make_shared<daf::base::PropertyList const>(),
-                        options);
+    fitsfile.writeImage(image, options, header, mask);
 #endif
 }
 

@@ -113,41 +113,6 @@ std::string scalingSchemeToString(ImageScalingOptions::ScalingScheme scheme)
 
 namespace {
 
-template <typename T>
-struct Bitpix;
-
-template <>
-struct Bitpix<std::uint8_t> {
-    static int const value = 8;
-};
-template <>
-struct Bitpix<std::int16_t> {
-    static int const value = 16;
-};
-template <>
-struct Bitpix<std::int32_t> {
-    static int const value = 32;
-};
-template <>
-struct Bitpix<std::int64_t> {
-    static int const value = 64;
-};
-#if 0
-template <>
-struct Bitpix<std::uint64_t> {
-    static int const value = 64;
-};
-template <>
-struct Bitpix<float> {
-    static int const value = -32;
-};
-template <>
-struct Bitpix<double> {
-    static int const value = -64;
-};
-#endif
-
-
 template <typename T, int N>
 std::pair<T, T> calculateMedianStdev(
     ndarray::Array<T const, N, N> const& image,
@@ -189,7 +154,7 @@ template <typename T, int N>
 ImageScale ImageScalingOptions::determineFromRange(
     ndarray::Array<T const, N, N> const& image,
     ndarray::Array<bool const, N, N> const& mask
-) {
+) const {
     double const range = std::pow(2.0, bitpix); // Range of values for target BITPIX
     T min = std::numeric_limits<T>::max(), max = std::numeric_limits<T>::min();
     auto mm = ndarray::flatten<1>(mask).begin();
@@ -209,7 +174,7 @@ template <typename T, int N>
 ImageScale ImageScalingOptions::determineFromStdev(
     ndarray::Array<T const, N, N> const& image,
     ndarray::Array<bool const, N, N> const& mask
-) {
+) const {
     auto stats = calculateMedianStdev(image, mask);
     auto const median = stats.first, stdev = stats.second;
 
@@ -241,12 +206,12 @@ ImageScale ImageScalingOptions::determineFromStdev(
 
 
 template <typename T, int N>
-ImageScale ImageScalingOptions::determineImpl(
+ImageScale ImageScalingOptions::determine(
     ndarray::Array<T const, N, N> const& image,
     ndarray::Array<bool const, N, N> const& mask
-) {
+) const {
     switch (scheme) {
-      case NONE: return ImageScale(bitpix, 1.0, 0.0);
+      case NONE: return ImageScale(0, 1.0, 0.0);
       case RANGE: return determineFromRange(image, mask);
       case ImageScalingOptions::STDEV_POSITIVE:
       case ImageScalingOptions::STDEV_NEGATIVE:
@@ -257,22 +222,15 @@ ImageScale ImageScalingOptions::determineImpl(
     }
 }
 
-template <typename DiskT, typename MemT>
-ndarray::Array<DiskT, 2, 2> ImageScale::toDisk(
-    ndarray::Array<MemT const, 2, 2> const& image,
+
+template <typename T>
+std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk(
+    ndarray::Array<T const, 2, 2> const& image,
     bool fuzz,
     unsigned long seed
-) {
-    // Having the user choose the right template is simpler than boost::mpl::for_each
-    if (Bitpix<DiskT>::value != bitpix) {
-        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
-                          "Output type doesn't match bitpix");
-    }
-    ndarray::Array<DiskT, 2, 2> disk(image.getShape());
-
-    if (bscale == 1.0 && bzero == 0.0 && !fuzz) {
-        disk.deep() = image;
-        return disk;
+) const {
+    if (bitpix <= 0 || (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
+        return detail::makePixelArray(bitpix, ndarray::flatten<1>(image));
     }
 
     math::Random rng(math::Random::MT19937, seed);
@@ -282,7 +240,9 @@ ndarray::Array<DiskT, 2, 2> ImageScale::toDisk(
     double const max = bitpix == 8 ? 255 : (std::pow(2.0, bitpix - 1) - 1.0);
 
     double const scale = 1.0/bscale;
-    auto outIter = ndarray::flatten<1>(disk).begin();
+    std::size_t const num = image.getNumElements();
+    ndarray::Array<double, 1, 1> out = ndarray::allocate(num);
+    auto outIter = out.begin();
     auto const& flatImage = ndarray::flatten<1>(image);
     for (auto inIter = flatImage.begin(); inIter != flatImage.end(); ++inIter, ++outIter) {
         double value = (*inIter - bzero)*scale;
@@ -301,40 +261,37 @@ ndarray::Array<DiskT, 2, 2> ImageScale::toDisk(
         *outIter = (value < min || value > max ? max : std::floor(value));
     }
 
-    return disk;
+    return detail::makePixelArray(bitpix, num);
 }
 
 
-template <typename MemT, typename DiskT>
-ndarray::Array<MemT, 2, 2> ImageScale::fromDisk(ndarray::Array<DiskT const, 2, 2> const& image) {
-    ndarray::Array<MemT, 2, 2> memory = ndarray::allocate(image.getShape());
+template <typename T>
+ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T const, 2, 2> const& image) const {
+    ndarray::Array<T, 2, 2> memory = ndarray::allocate(image.getShape());
     memory.deep() = bscale*image + bzero;
     return memory;
 }
 
 
 // Explicit instantiation
-#define INSTANTIATE2(MEMTYPE, DISKTYPE) \
-template ndarray::Array<DISKTYPE, 2, 2> ImageScale::toDisk<DISKTYPE, MEMTYPE>( \
-    ndarray::Array<MEMTYPE const, 2, 2> const&, bool, unsigned long); \
-template ndarray::Array<MEMTYPE, 2, 2> ImageScale::fromDisk<MEMTYPE, DISKTYPE>( \
-    ndarray::Array<DISKTYPE const, 2, 2> const&); \
-template ndarray::Array<DISKTYPE, 2, 2> ImageScalingOptions::apply<DISKTYPE, MEMTYPE>( \
-    image::Image<MEMTYPE> const&, std::shared_ptr<image::Mask<image::MaskPixel>>);
+#define INSTANTIATE(TYPE) \
+    template ImageScale ImageScalingOptions::determine<TYPE, 2>( \
+        ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool const, 2, 2> const& mask) const; \
+    template std::shared_ptr<detail::PixelArrayBase> ImageScalingOptions::apply<TYPE, 2>( \
+        ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool const, 2, 2> const& mask) const; \
+    template std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk<TYPE>( \
+        ndarray::Array<TYPE const, 2, 2> const&, bool, unsigned long) const; \
+    template ndarray::Array<TYPE, 2, 2> ImageScale::fromDisk<TYPE>( \
+        ndarray::Array<TYPE const, 2, 2> const&) const; \
 
-#define INSTANTIATE1(MEMTYPE) \
-template ImageScale ImageScalingOptions::determine<MEMTYPE>( \
-    image::Image<MEMTYPE> const&, std::shared_ptr<image::Mask<image::MaskPixel>>); \
-template ImageScale ImageScalingOptions::determineImpl<MEMTYPE, 2>( \
-    ndarray::Array<MEMTYPE const, 2, 2> const& image, ndarray::Array<bool const, 2, 2> const& mask); \
-INSTANTIATE2(MEMTYPE, std::int16_t); \
-INSTANTIATE2(MEMTYPE, std::int32_t); \
-INSTANTIATE2(MEMTYPE, std::int64_t);
-
-INSTANTIATE1(std::uint16_t);
-INSTANTIATE1(std::int32_t);
-INSTANTIATE1(std::uint64_t);
-INSTANTIATE1(float);
-INSTANTIATE1(double);
+INSTANTIATE(std::uint8_t);
+INSTANTIATE(std::uint16_t);
+INSTANTIATE(std::int16_t);
+INSTANTIATE(std::uint32_t);
+INSTANTIATE(std::int32_t);
+INSTANTIATE(std::uint64_t);
+INSTANTIATE(std::int64_t);
+INSTANTIATE(boost::float32_t);
+INSTANTIATE(boost::float64_t);
 
 }}} // namespace lsst::afw::fits

@@ -22,21 +22,31 @@
 
 #include <pybind11/pybind11.h>
 //#include <pybind11/operators.h>
-//#include <pybind11/stl.h>
+#include <pybind11/stl.h>
 
 #include "numpy/arrayobject.h"
+#include "ndarray/pybind11.h"
 
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/pex/exceptions/python/Exception.h"
 #include "lsst/daf/base.h"
+#include "lsst/afw/image/Image.h"
 
 #include "lsst/afw/fits.h"
 
 namespace py = pybind11;
 
 using namespace lsst::afw::fits;
+using namespace lsst::afw::fits::detail;
 using namespace pybind11::literals;
+
+
+void definePixelArray(py::module & mod) {
+    // Very minimal because this carries internal details and shouldn't be needed from python
+    py::class_<detail::PixelArrayBase, std::shared_ptr<detail::PixelArrayBase>> cls(mod, "PixelArrayBase");
+    cls.def("getNum", &PixelArrayBase::getNum);
+};
 
 
 void defineImageCompression(py::module & mod) {
@@ -72,19 +82,12 @@ void defineImageCompression(py::module & mod) {
     cls.def_readonly("quantizeLevel", &ImageCompressionOptions::quantizeLevel);
 }
 
-template <typename DiskT, typename MemT>
-void defineImageScalingOptionsTemplates2(py::class_<ImageScalingOptions> & cls, std::string const& suffix) {
-    cls.def(("apply" + suffix).c_str(), &ImageScalingOptions::apply<DiskT, MemT>);
-}
 
 template <typename T>
-void defineImageScalingOptionsTemplates1(py::class_<ImageScalingOptions> & cls) {
+void defineImageScalingOptionsTemplates(py::class_<ImageScalingOptions> & cls) {
     cls.def("determine", &ImageScalingOptions::determine<T>);
-    defineImageScalingOptionsTemplates2<std::int16_t, T>(cls, "S16");
-    defineImageScalingOptionsTemplates2<std::int32_t, T>(cls, "S32");
-    defineImageScalingOptionsTemplates2<std::int64_t, T>(cls, "S64");
+    cls.def("apply", &ImageScalingOptions::apply<T>);
 }
-
 
 void defineImageScalingOptions(py::module & mod) {
     py::class_<ImageScalingOptions> cls(mod, "ImageScalingOptions");
@@ -97,9 +100,10 @@ void defineImageScalingOptions(py::module & mod) {
     scheme.value("MANUAL", ImageScalingOptions::ScalingScheme::MANUAL);
     scheme.export_values();
 
+    cls.def(py::init<>());
     cls.def(py::init<ImageScalingOptions::ScalingScheme, int, std::vector<std::string> const&, unsigned long,
                      float, float, bool, double, double>(),
-            "scheme"_a, "bitpix"_a, "maskPlanes"_a, "seed"_a, "quantizeLevel"_a=4.0, "quantizePad"_a=5.0,
+            "scheme"_a, "bitpix"_a, "maskPlanes"_a, "seed"_a=1, "quantizeLevel"_a=4.0, "quantizePad"_a=5.0,
             "fuzz"_a=true, "bscale"_a=1.0, "bzero"_a=0.0);
 
     cls.def_readonly("scheme", &ImageScalingOptions::scheme);
@@ -112,26 +116,14 @@ void defineImageScalingOptions(py::module & mod) {
     cls.def_readonly("bscale", &ImageScalingOptions::bscale);
     cls.def_readonly("bzero", &ImageScalingOptions::bzero);
 
-    defineImageScalingOptionsTemplates1<std::uint16_t>(cls);
-    defineImageScalingOptionsTemplates1<std::int32_t>(cls);
-    defineImageScalingOptionsTemplates1<std::uint64_t>(cls);
-    defineImageScalingOptionsTemplates1<float>(cls);
-    defineImageScalingOptionsTemplates1<double>(cls);
+    defineImageScalingOptionsTemplates<float>(cls);
+    defineImageScalingOptionsTemplates<double>(cls);
 }
 
-template <typename DiskT, typename MemT>
-void defineImageScaleTemplates2(py::class_<ImageScale> & cls, std::string const& diskSuffix,
-                                std::string const & memSuffix) {
-    cls.def(("toDisk" + diskSuffix).c_str(), &ImageScale::toDisk<DiskT, MemT>, "image"_a, "fuzz"_a,
-            "seed"_a=0);
-    cls.def(("fromDisk" + memSuffix).c_str(), &ImageScale::fromDisk<MemT, DiskT>);
-}
-
-template <typename MemT>
-void defineImageScaleTemplates1(py::class_<ImageScale> & cls, std::string const& suffix) {
-    defineImageScaleTemplates2<std::int16_t, MemT>(cls, "S16", suffix);
-    defineImageScaleTemplates2<std::int32_t, MemT>(cls, "S32", suffix);
-    defineImageScaleTemplates2<std::int64_t, MemT>(cls, "S64", suffix);
+template <typename T>
+void defineImageScaleTemplates(py::class_<ImageScale> & cls, std::string const& suffix) {
+    cls.def("toDisk", &ImageScale::toDisk<T>, "image"_a, "fuzz"_a=true, "seed"_a=1);
+    cls.def("fromDisk", &ImageScale::fromDisk<T>);
 }
 
 void defineImageScale(py::module & mod) {
@@ -141,11 +133,24 @@ void defineImageScale(py::module & mod) {
     cls.def_readonly("bscale", &ImageScale::bscale);
     cls.def_readonly("bzero", &ImageScale::bzero);
 
-    defineImageScaleTemplates1<std::uint16_t>(cls, "U16");
-    defineImageScaleTemplates1<std::int32_t>(cls, "S32");
-    defineImageScaleTemplates1<std::uint64_t>(cls, "U64");
-    defineImageScaleTemplates1<float>(cls, "F32");
-    defineImageScaleTemplates1<double>(cls, "F64");
+    defineImageScaleTemplates<float>(cls, "F");
+    defineImageScaleTemplates<double>(cls, "D");
+}
+
+void defineImageWriteOptions(py::module & mod) {
+    py::class_<ImageWriteOptions> cls(mod, "ImageWriteOptions");
+
+    cls.def(py::init<lsst::afw::image::Image<std::uint16_t>>());
+    cls.def(py::init<lsst::afw::image::Image<std::int32_t>>());
+    cls.def(py::init<lsst::afw::image::Image<std::uint64_t>>());
+    cls.def(py::init<lsst::afw::image::Image<float>>());
+    cls.def(py::init<lsst::afw::image::Image<double>>());
+
+    cls.def(py::init<lsst::afw::image::Mask<lsst::afw::image::MaskPixel>>());
+
+    cls.def(py::init<ImageCompressionOptions const&, ImageScalingOptions const&>(),
+            "compression"_a, "scaling"_a=ImageScalingOptions());
+    cls.def(py::init<ImageScalingOptions const&>());
 }
 
 // Wrapping for lsst::afw::fits::Fits
@@ -218,6 +223,7 @@ PYBIND11_PLUGIN(_fits) {
     defineImageCompression(mod);
     defineImageScalingOptions(mod);
     defineImageScale(mod);
+    defineImageWriteOptions(mod);
     defineFits(mod);
 
     mod.def("readMetadata",

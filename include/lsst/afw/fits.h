@@ -182,22 +182,31 @@ private:
 };
 
 
+template <typename T, int N, int C>
+ndarray::Array<T const, N, N> const makeContiguousArray(ndarray::Array<T, N, C> const& array) {
+    ndarray::Array<T const, N, N> contiguous = ndarray::dynamic_dimension_cast<N>(array);
+    if (contiguous.empty()) contiguous = ndarray::copy(array);
+    return contiguous;
+}
 
 
 /// Options for writing an image
 struct ImageWriteOptions {
     ImageCompressionOptions compression;
-    // Additional information:
-    // * Scaling (polymorphic class to implement different styles?)
-    //   + Manual BSCALE, BZERO
-    //   + Options for fuzzing values when quantising
-    //   + How to calculate scaling
-    //   + BITPIX
+    ImageScalingOptions scaling;
 
     template <typename T>
     ImageWriteOptions(image::Image<T> const& image) : compression(image) {}
     template <typename T>
     ImageWriteOptions(image::Mask<T> const& mask) : compression(mask) {}
+
+    ImageWriteOptions(
+        ImageCompressionOptions const& compression_,
+        ImageScalingOptions const& scaling_=ImageScalingOptions())
+      : compression(compression_), scaling(scaling_) {}
+
+    ImageWriteOptions(ImageScalingOptions const& scaling_)
+      : compression(ImageCompressionOptions::NONE), scaling(scaling_) {}
 };
 
 
@@ -218,17 +227,9 @@ struct ImageWriteOptions {
  *  calls are all 1-indexed.
  */
 class Fits {
-    template <typename T>
-    void createImageImpl(int nAxis, long const* nAxes);
+    void createImageImpl(int bitpix, int nAxis, long const* nAxes);
     template <typename T>
     void writeImageImpl(T const* data, int nElements);
-    template <typename T>
-    void writeImageImpl(
-        T const* data,
-        int nDims,
-        long const* dims,
-        std::shared_ptr<daf::base::PropertyList const> header,
-        ImageWriteOptions const& options);
     template <typename T>
     void readImageImpl(int nAxis, T* data, long* begin, long* end, long* increment);
     void getImageShapeImpl(int maxDim, long* nAxes);
@@ -374,7 +375,13 @@ public:
     template <typename PixelT, int N>
     void createImage(ndarray::Vector<ndarray::Size, N> const& shape) {
         ndarray::Vector<long, N> nAxes(shape.reverse());
-        createImageImpl<PixelT>(N, nAxes.elems);
+        createImageImpl(detail::Bitpix<PixelT>::value, N, nAxes.elems);
+    }
+
+    template <int N>
+    void createImage(int bitpix, ndarray::Vector<ndarray::Size, N> const& shape) {
+        ndarray::Vector<long, N> nAxes(shape.reverse());
+        createImageImpl(bitpix, N, nAxes.elems);
     }
 
     /**
@@ -386,7 +393,7 @@ public:
     template <typename PixelT>
     void createImage(long x, long y) {
         long naxes[2] = {x, y};
-        createImageImpl<PixelT>(2, naxes);
+        createImageImpl(detail::Bitpix<PixelT>::value, 2, naxes);
     }
 
     /**
@@ -398,20 +405,17 @@ public:
      */
     template <typename T, int N, int C>
     void writeImage(ndarray::Array<T const, N, C> const& array) {
-        ndarray::Array<T const, N, N> contiguous = ndarray::dynamic_dimension_cast<N>(array);
-        if (contiguous.empty()) contiguous = ndarray::copy(array);
-        writeImageImpl(contiguous.getData(), contiguous.getNumElements());
+        writeImageImpl(makeContiguousArray(array).getData(), array.getNumElements());
     }
 
-    template <typename T, int N, int C>
-    void writeImage(ndarray::Array<T const, N, C> const& array,
-                    std::shared_ptr<daf::base::PropertyList const> header,
-                    ImageWriteOptions const& options) {
-        ndarray::Array<T const, N, N> contiguous = ndarray::dynamic_dimension_cast<N>(array);
-        if (contiguous.empty()) contiguous = ndarray::copy(array);
-        ndarray::Vector<long, N> dims(contiguous.getShape().reverse());
-        writeImageImpl(contiguous.getData(), N, dims.elems, header, options);
-    }
+    template <typename T>
+    void writeImage(
+        image::ImageBase<T> const& image,
+        ImageWriteOptions const& options,
+        std::shared_ptr<daf::base::PropertyList const> header=std::shared_ptr<daf::base::PropertyList>(),
+        std::shared_ptr<image::Mask<image::MaskPixel> const> mask=
+            std::shared_ptr<image::Mask<image::MaskPixel>>()
+    );
 
     /// Return the number of dimensions in the current HDU.
     int getImageDim();

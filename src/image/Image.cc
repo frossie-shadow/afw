@@ -228,21 +228,6 @@ void swap(ImageBase<PixelT>& a, ImageBase<PixelT>& b) {
     a.swap(b);
 }
 
-template <typename PixelT>
-typename ImageBase<PixelT>::Array ImageBase<PixelT>::getArray() {
-    int rowStride = reinterpret_cast<PixelT*>(row_begin(1)) - reinterpret_cast<PixelT*>(row_begin(0));
-    return ndarray::external(reinterpret_cast<PixelT*>(row_begin(0)),
-                             ndarray::makeVector(getHeight(), getWidth()), ndarray::makeVector(rowStride, 1),
-                             this->_manager);
-}
-
-template <typename PixelT>
-typename ImageBase<PixelT>::ConstArray ImageBase<PixelT>::getArray() const {
-    int rowStride = reinterpret_cast<PixelT*>(row_begin(1)) - reinterpret_cast<PixelT*>(row_begin(0));
-    return ndarray::external(reinterpret_cast<PixelT*>(row_begin(0)),
-                             ndarray::makeVector(getHeight(), getWidth()), ndarray::makeVector(rowStride, 1),
-                             this->_manager);
-}
 //
 // Iterators
 //
@@ -387,6 +372,7 @@ Image<PixelT>::Image(fits::Fits& fitsfile, std::shared_ptr<daf::base::PropertySe
     fits_read_image<fits_image_types>(fitsfile, *this, *metadata, bbox, origin);
 }
 
+
 template <typename PixelT>
 void Image<PixelT>::writeFits(std::string const& fileName,
                               std::shared_ptr<daf::base::PropertySet const> metadata_i,
@@ -419,11 +405,13 @@ void Image<PixelT>::writeFits(fits::Fits& fitsfile,
 }
 
 template <typename PixelT>
-void Image<PixelT>::writeFits(fits::Fits& fitsfile, daf::base::PropertyList const& header,
-                              fits::ImageWriteOptions const& options)
-{
-
-
+void Image<PixelT>::writeFits(
+    fits::Fits& fitsfile,
+    fits::ImageWriteOptions const& options,
+    std::shared_ptr<daf::base::PropertySet const> header,
+    std::shared_ptr<Mask<MaskPixel> const> mask
+) const {
+    fits_write_image(fitsfile, *this, options, header, mask);
 }
 
 

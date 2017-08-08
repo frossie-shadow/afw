@@ -5,6 +5,8 @@
 #include <string>
 #include <limits>
 
+#include "boost/cstdfloat.hpp"
+
 #include "lsst/pex/exceptions.h"
 #include "lsst/daf/base.h"
 #include "ndarray.h"
@@ -19,6 +21,145 @@ namespace fits {
 
 // Forward declarations
 class Fits;
+
+namespace detail {
+
+template <typename T>
+struct Bitpix;
+
+template <>
+struct Bitpix<std::int16_t> {
+    static int const value = 16;
+};
+template <>
+struct Bitpix<std::int32_t> {
+    static int const value = 32;
+};
+template <>
+struct Bitpix<std::int64_t> {
+    static int const value = 64;
+};
+#if 0
+template <>
+struct Bitpix<std::uint8_t> {
+    static int const value = 8;
+};
+template <>
+struct Bitpix<std::uint16_t> {
+    static int const value = 16;
+};
+template <>
+struct Bitpix<std::uint32_t> {
+    static int const value = 32;
+};
+template <>
+struct Bitpix<std::uint64_t> {
+    static int const value = 64;
+};
+#endif
+template <>
+struct Bitpix<float> {
+    static int const value = -32;
+};
+template <>
+struct Bitpix<double> {
+    static int const value = -64;
+};
+
+
+template <int bitpix>
+struct BitpixType;
+
+template <>
+struct BitpixType<16> {
+    typedef std::int16_t type;
+};
+template <>
+struct BitpixType<32> {
+    typedef std::int32_t type;
+};
+template <>
+struct BitpixType<64> {
+    typedef std::int64_t type;
+};
+template <>
+struct BitpixType<-32> {
+    typedef boost::float32_t type;
+};
+template <>
+struct BitpixType<-64> {
+    typedef boost::float64_t type;
+};
+
+class PixelArrayBase {
+  public:
+    PixelArrayBase(std::size_t num) : _num(num) {}
+    virtual ~PixelArrayBase() {}
+    virtual void * getData() const = 0;
+    std::size_t getNum() const { return _num; }
+
+  private:
+    std::size_t _num;
+};
+
+template <typename T>
+class PixelArray : public PixelArrayBase {
+  public:
+    PixelArray(std::size_t num)
+      : PixelArrayBase(num), _pixels(reinterpret_cast<PixelT *>(new T [num])) {}
+
+    template <typename U>
+    PixelArray(ndarray::ArrayRef<U, 1, 1> const& array)
+      : PixelArrayBase(array.getNumElements()), _pixels(reinterpret_cast<PixelT *>(new T [getNum()])) {
+        std::copy(array.begin(), array.end(), reinterpret_cast<T *>(_pixels));
+    }
+
+    virtual ~PixelArray() {
+        delete [] _pixels;
+    }
+
+    void * getData() const override { return reinterpret_cast<void *>(_pixels); }
+
+  private:
+    typedef std::uint8_t PixelT;  // bytes, because 'void' doesn't work, and bytes are next most generic
+    PixelT * _pixels;
+};
+
+inline std::shared_ptr<PixelArrayBase> makePixelArray(int bitpix, int num) {
+    switch (bitpix) {
+      case 16: return std::make_shared<PixelArray<std::int16_t>>(num);
+      case 32: return std::make_shared<PixelArray<std::int32_t>>(num);
+      case 64: return std::make_shared<PixelArray<std::int64_t>>(num);
+//      case -32: return std::make_shared<PixelArray<boost::float32_t>>(num);
+//      case -64: return std::make_shared<PixelArray<boost::float64_t>>(num);
+      default:
+        std::ostringstream os;
+        os << "Unrecognized bitpix: " << bitpix;
+        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError, os.str());
+    }
+}
+
+template <typename T>
+std::shared_ptr<PixelArrayBase> makePixelArray(
+    int bitpix,
+    ndarray::ArrayRef<T, 1, 1> const& array
+) {
+    switch (bitpix) {
+      case 16: return std::make_shared<PixelArray<std::int16_t>>(array);
+      case 32: return std::make_shared<PixelArray<std::int32_t>>(array);
+      case 64: return std::make_shared<PixelArray<std::int64_t>>(array);
+      case -32: return std::make_shared<PixelArray<boost::float32_t>>(array);
+      case -64: return std::make_shared<PixelArray<boost::float64_t>>(array);
+      default:
+        std::ostringstream os;
+        os << "Unrecognized bitpix: " << bitpix;
+        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError, os.str());
+    }
+}
+
+
+
+} // namespace detail
 
 /// Options for tile compression of image pixels
 struct ImageCompressionOptions {
@@ -88,6 +229,7 @@ ImageCompressionOptions::CompressionScheme compressionSchemeFromCfitsio(int cfit
 int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme);
 
 
+
 class ImageScale {
   public:
     int bitpix;
@@ -97,15 +239,15 @@ class ImageScale {
     ImageScale(int bitpix_, double bscale_, double bzero_) :
       bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
 
-    template <typename DiskT, typename MemT>
-    ndarray::Array<DiskT, 2, 2> toDisk(
-        ndarray::Array<MemT const, 2, 2> const& image,
+    template <typename T>
+    std::shared_ptr<detail::PixelArrayBase> toDisk(
+        ndarray::Array<T const, 2, 2> const& image,
         bool fuzz,
-        unsigned long seed
-    );
+        unsigned long seed=1
+    ) const;
 
-    template <typename MemT, typename DiskT>
-    ndarray::Array<MemT, 2, 2> fromDisk(ndarray::Array<DiskT const, 2, 2> const& image);
+    template <typename T>
+    ndarray::Array<T, 2, 2> fromDisk(ndarray::Array<T const, 2, 2> const& image) const;
 };
 
 
@@ -129,11 +271,14 @@ class ImageScalingOptions {
     float quantizePad;                     ///< Number of standard deviations to pad off the edge
     double bscale, bzero;               ///< Manually specified BSCALE and BZERO (for SCALE_MANUAL)
 
+    // Disable scaling by default
+    ImageScalingOptions() : scheme(NONE) {}
+
     ImageScalingOptions(
         ScalingScheme scheme_,
         int bitpix_,
-        std::vector<std::string> const& maskPlanes_,
-        unsigned long seed_,
+        std::vector<std::string> const& maskPlanes_={},
+        unsigned long seed_=1,
         float quantizeLevel_=4.0,
         float quantizePad_=5.0,
         bool fuzz_=true,
@@ -142,30 +287,58 @@ class ImageScalingOptions {
     ) : scheme(scheme_), bitpix(bitpix_), fuzz(fuzz_), seed(seed_), maskPlanes(maskPlanes_),
         quantizeLevel(quantizeLevel_), quantizePad(quantizePad_), bscale(bscale_), bzero(bzero_) {}
 
+    ImageScalingOptions(int bitpix_, double bscale_=1.0, double bzero_=0.0)
+      : scheme(MANUAL), bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
+
     template <typename T>
     ImageScale determine(
-        image::Image<T> const& image,
-        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
-    ) {
+        image::ImageBase<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel> const> mask=
+            std::shared_ptr<image::Mask<image::MaskPixel>>()
+    ) const {
         auto const arrays = _toArray(image, mask);
-        return determineImpl(arrays.first, arrays.second);
+        return determine(arrays.first, arrays.second);
     }
 
-    template <typename DiskT, typename MemT>
-    ndarray::Array<DiskT, 2, 2> apply(
-        image::Image<MemT> const& image,
-        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
-    ) {
+    template <typename T, int N>
+    ImageScale determine(
+        ndarray::Array<T const, N, N> const& image,
+        ndarray::Array<bool const, N, N> const& mask
+    ) const;
+
+    template <typename T>
+    std::shared_ptr<detail::PixelArrayBase> apply(
+        image::ImageBase<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel>const> mask=
+            std::shared_ptr<image::Mask<image::MaskPixel>>()
+    ) const {
         auto const arrays = _toArray(image, mask);
-        return determineImpl(arrays.first, arrays.second).template toDisk<DiskT>(arrays.first, fuzz, seed);
+        return apply(arrays.first, arrays.second);
+    }
+
+    template <typename T, int N>
+    std::shared_ptr<detail::PixelArrayBase> apply(
+        ndarray::Array<T const, N, N> const& image,
+        ndarray::Array<bool const, N, N> const& mask
+    ) const {
+        return determine(image, mask).toDisk(image, fuzz, seed);
     }
 
   private:
     template <typename T>
     std::pair<ndarray::Array<T const, 2, 2>, ndarray::Array<bool const, 2, 2>> _toArray(
-        image::Image<T> const& image,
-        std::shared_ptr<image::Mask<image::MaskPixel>> mask=std::shared_ptr<image::Mask<image::MaskPixel>>()
-    ) {
+        image::ImageBase<T> const& image,
+        std::shared_ptr<image::Mask<image::MaskPixel> const> mask=
+            std::shared_ptr<image::Mask<image::MaskPixel>>()
+    ) const {
+        if (mask && image.getDimensions() != mask->getDimensions()) {
+            std::ostringstream os;
+            os << "Size mismatch between image and mask: ";
+            os << image.getWidth() << "x" << image.getHeight();
+            os << " vs ";
+            os << mask->getWidth() << "x" << mask->getHeight();
+            throw LSST_EXCEPT(pex::exceptions::InvalidParameterError, os.str());
+        }
         ndarray::Array<T const, 2, 2> imageArray = ndarray::dynamic_dimension_cast<2>(image.getArray());
         if (imageArray.empty()) imageArray = ndarray::copy(image.getArray());
         ndarray::Array<bool, 2, 2> maskArray = ndarray::allocate(imageArray.getShape());
@@ -178,21 +351,15 @@ class ImageScalingOptions {
     }
 
     template <typename T, int N>
-    ImageScale determineImpl(
-        ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool const, N, N> const& mask
-    );
-
-    template <typename T, int N>
     ImageScale determineFromRange(
         ndarray::Array<T const, N, N> const& image,
         ndarray::Array<bool const, N, N> const& mask
-    );
+    ) const;
     template <typename T, int N>
     ImageScale determineFromStdev(
         ndarray::Array<T const, N, N> const& image,
         ndarray::Array<bool const, N, N> const& mask
-    );
+    ) const;
 
 };
 
