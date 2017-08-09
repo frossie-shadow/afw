@@ -143,6 +143,13 @@ PyMaskedImage<ImagePixelT> declareMaskedImage(py::module &mod, const std::string
             "imageMetadata"_a = std::shared_ptr<daf::base::PropertySet const>(),
             "maskMetadata"_a = std::shared_ptr<daf::base::PropertySet const>(),
             "varianceMetadata"_a = std::shared_ptr<daf::base::PropertySet const>());
+    cls.def("writeFits", [](MI & self, fits::Fits &fits, fits::ImageWriteOptions const& imageOptions,
+                            fits::ImageWriteOptions const& maskOptions,
+                            fits::ImageWriteOptions const& varianceOptions,
+                            std::shared_ptr<daf::base::PropertySet const> header) {
+                                self.writeFits(fits, imageOptions, maskOptions, varianceOptions, header); },
+            "fits"_a, "imageOptions"_a, "maskOptions"_a, "varianceOptions"_a,
+            "header"_a=std::shared_ptr<daf::base::PropertyList>());
 
     cls.def_static("readFits", (MI(*)(std::string const &))MI::readFits, "filename"_a);
     cls.def_static("readFits", (MI(*)(fits::MemFileManager &))MI::readFits, "manager"_a);

@@ -549,6 +549,47 @@ void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(
     _variance->writeFits(fitsfile, hdr);
 }
 
+
+template <typename ImagePixelT, typename MaskPixelT, typename VariancePixelT>
+void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(
+    fits::Fits& fitsfile,
+    fits::ImageWriteOptions const& imageOptions,
+    fits::ImageWriteOptions const& maskOptions,
+    fits::ImageWriteOptions const& varianceOptions,
+    std::shared_ptr<daf::base::PropertySet const> metadata,
+    std::shared_ptr<daf::base::PropertySet const> imageMetadata,
+    std::shared_ptr<daf::base::PropertySet const> maskMetadata,
+    std::shared_ptr<daf::base::PropertySet const> varianceMetadata
+) const {
+    std::shared_ptr<daf::base::PropertySet> header;
+    if (metadata) {
+        header = metadata->deepCopy();
+    } else {
+        header = std::make_shared<daf::base::PropertyList>();
+    }
+    if (fitsfile.countHdus() != 0) {
+        throw LSST_EXCEPT(pex::exceptions::LogicError,
+                          "MaskedImage::writeFits can only write to an empty file");
+    }
+    if (fitsfile.getHdu() < 1) {
+        // Don't ever write images to primary; instead we make an empty primary.
+        fitsfile.createEmpty();
+    } else {
+        fitsfile.setHdu(0);
+    }
+    fitsfile.writeMetadata(*header);
+
+    processPlaneMetadata(imageMetadata, header, "IMAGE");
+    _image->writeFits(fitsfile, imageOptions, header, _mask);
+
+    processPlaneMetadata(maskMetadata, header, "MASK");
+    _mask->writeFits(fitsfile, maskOptions, header);
+
+    processPlaneMetadata(varianceMetadata, header, "VARIANCE");
+    _variance->writeFits(fitsfile, varianceOptions, header, _mask);
+}
+
+
 // private function conformSizes() ensures that the Mask and Variance have the same dimensions
 // as Image.  If Mask and/or Variance have non-zero dimensions that conflict with the size of Image,
 // a lsst::pex::exceptions::LengthError is thrown.

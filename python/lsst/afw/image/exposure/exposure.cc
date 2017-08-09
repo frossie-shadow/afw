@@ -117,6 +117,11 @@ PyExposure<PixelT> declareExposure(py::module &mod, const std::string &suffix) {
 
     cls.def("writeFits", (void (ExposureT::*)(std::string const &) const) & ExposureT::writeFits);
     cls.def("writeFits", (void (ExposureT::*)(fits::MemFileManager &) const) & ExposureT::writeFits);
+    cls.def("writeFits", [](ExposureT & self, fits::Fits &fits, fits::ImageWriteOptions const& imageOptions,
+                            fits::ImageWriteOptions const& maskOptions,
+                            fits::ImageWriteOptions const& varianceOptions) {
+                                self.writeFits(fits, imageOptions, maskOptions, varianceOptions); },
+            "fits"_a, "imageOptions"_a, "maskOptions"_a, "varianceOptions"_a);
 
     cls.def_static("readFits", (ExposureT(*)(std::string const &))ExposureT::readFits);
     cls.def_static("readFits", (ExposureT(*)(fits::MemFileManager &))ExposureT::readFits);

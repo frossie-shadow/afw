@@ -521,6 +521,16 @@ void Mask<MaskPixelT>::writeFits(fits::Fits& fitsfile,
     fits_write_image(fitsfile, *this, fits::ImageWriteOptions(*this), metadata);
 }
 
+template <typename MaskPixelT>
+void Mask<MaskPixelT>::writeFits(
+    fits::Fits& fitsfile,
+    fits::ImageWriteOptions const& options,
+    std::shared_ptr<daf::base::PropertySet const> header
+) const {
+    fits_write_image(fitsfile, *this, options, header);
+}
+
+
 #endif  // !DOXYGEN
 
 namespace {

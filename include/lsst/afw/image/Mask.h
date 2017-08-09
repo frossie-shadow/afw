@@ -348,6 +348,14 @@ public:
     void writeFits(fits::Fits& fitsfile, std::shared_ptr<lsst::daf::base::PropertySet const> metadata =
                                                  std::shared_ptr<lsst::daf::base::PropertySet const>()) const;
 
+    void writeFits(
+        fits::Fits& fitsfile,
+        fits::ImageWriteOptions const& options,
+        std::shared_ptr<daf::base::PropertySet const> header=
+            std::shared_ptr<lsst::daf::base::PropertySet const>()
+    ) const;
+
+
     /**
      *  Read a Mask from a regular FITS file.
      *

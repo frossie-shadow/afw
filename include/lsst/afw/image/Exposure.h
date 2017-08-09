@@ -333,6 +333,13 @@ public:
      */
     void writeFits(fits::Fits& fitsfile) const;
 
+    void writeFits(
+        fits::Fits& fitsfile,
+        fits::ImageWriteOptions const& imageOptions,
+        fits::ImageWriteOptions const& maskOptions,
+        fits::ImageWriteOptions const& varianceOptions
+   ) const;
+
     /**
      *  Read an Exposure from a regular FITS file.
      *

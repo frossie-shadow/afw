@@ -936,6 +936,21 @@ public:
                    std::shared_ptr<daf::base::PropertySet const> varianceMetadata =
                            std::shared_ptr<daf::base::PropertySet const>()) const;
 
+    void writeFits(
+        fits::Fits& fitsfile,
+        fits::ImageWriteOptions const& imageOptions,
+        fits::ImageWriteOptions const& maskOptions,
+        fits::ImageWriteOptions const& varianceOptions,
+        std::shared_ptr<daf::base::PropertySet const> metadata =
+            std::shared_ptr<daf::base::PropertySet const>(),
+        std::shared_ptr<daf::base::PropertySet const> imageMetadata =
+               std::shared_ptr<daf::base::PropertySet const>(),
+        std::shared_ptr<daf::base::PropertySet const> maskMetadata =
+               std::shared_ptr<daf::base::PropertySet const>(),
+        std::shared_ptr<daf::base::PropertySet const> varianceMetadata =
+               std::shared_ptr<daf::base::PropertySet const>()
+    ) const;
+
     /**
      *  Read a MaskedImage from a regular FITS file.
      *

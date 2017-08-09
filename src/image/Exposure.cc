@@ -154,6 +154,19 @@ void Exposure<ImageT, MaskT, VarianceT>::writeFits(fits::Fits &fitsfile) const {
     _info->_finishWriteFits(fitsfile, data);
 }
 
+template <typename ImageT, typename MaskT, typename VarianceT>
+void Exposure<ImageT, MaskT, VarianceT>::writeFits(
+    fits::Fits &fitsfile,
+    fits::ImageWriteOptions const& imageOptions,
+    fits::ImageWriteOptions const& maskOptions,
+    fits::ImageWriteOptions const& varianceOptions
+) const {
+    ExposureInfo::FitsWriteData data = _info->_startWriteFits(getXY0());
+    _maskedImage.writeFits(fitsfile, imageOptions, maskOptions, varianceOptions, data.metadata,
+                           data.imageMetadata, data.maskMetadata, data.varianceMetadata);
+    _info->_finishWriteFits(fitsfile, data);
+}
+
 // Explicit instantiations
 /// @cond
 template class Exposure<std::uint16_t>;

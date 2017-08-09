@@ -87,7 +87,6 @@ void defineImageCompression(py::module & mod) {
 template <typename T>
 void defineImageScalingOptionsTemplates(py::class_<ImageScalingOptions> & cls) {
     cls.def("determine", &ImageScalingOptions::determine<T>);
-//    cls.def("apply", &ImageScalingOptions::apply<T>);
 }
 
 void defineImageScalingOptions(py::module & mod) {
@@ -104,8 +103,8 @@ void defineImageScalingOptions(py::module & mod) {
     cls.def(py::init<>());
     cls.def(py::init<ImageScalingOptions::ScalingScheme, int, std::vector<std::string> const&, unsigned long,
                      float, float, bool, double, double>(),
-            "scheme"_a, "bitpix"_a, "maskPlanes"_a, "seed"_a=1, "quantizeLevel"_a=4.0, "quantizePad"_a=5.0,
-            "fuzz"_a=true, "bscale"_a=1.0, "bzero"_a=0.0);
+            "scheme"_a, "bitpix"_a, "maskPlanes"_a=std::vector<std::string>(), "seed"_a=1,
+            "quantizeLevel"_a=4.0, "quantizePad"_a=5.0, "fuzz"_a=true, "bscale"_a=1.0, "bzero"_a=0.0);
 
     cls.def_readonly("scheme", &ImageScalingOptions::scheme);
     cls.def_readonly("bitpix", &ImageScalingOptions::bitpix);
