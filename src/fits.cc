@@ -20,6 +20,7 @@ extern "C" {
 #include "lsst/log/Log.h"
 #include "lsst/afw/fits.h"
 #include "lsst/afw/geom/Angle.h"
+#include "lsst/afw/image/Wcs.h"
 #include "lsst/afw/fitsCompression.h"
 
 namespace lsst {
@@ -191,6 +192,21 @@ struct FitsBitPix<double> {
 };
 
 static bool allowImageCompression = true;
+
+int fitsTypeForBitpix(int bitpix) {
+    switch (bitpix) {
+      case 8: return TBYTE;
+      case 16: return TSHORT;
+      case 32: return TINT;
+      case 64: return TLONGLONG;
+      case -32: return TFLOAT;
+      case -64: return TDOUBLE;
+      default:
+        std::ostringstream os;
+        os << "Invalid bitpix value: " << bitpix;
+        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError, os.str());
+    }
+}
 
 }  // anonymous
 
@@ -925,7 +941,7 @@ template <typename T>
 void Fits::writeImage(
     image::ImageBase<T> const& image,
     ImageWriteOptions const& options,
-    std::shared_ptr<daf::base::PropertyList const> header,
+    std::shared_ptr<daf::base::PropertySet const> header,
     std::shared_ptr<image::Mask<image::MaskPixel> const> mask
 ) {
     auto fits = reinterpret_cast<fitsfile *>(fptr);
@@ -936,15 +952,26 @@ void Fits::writeImage(
     }
 #endif
 
-    // XXX custom scaling of image goes here
     ImageScale scale = options.scaling.determine(image, mask);
 
     // We need a place to put the image+header, and CFITSIO needs to know the dimenions.
     ndarray::Vector<long, 2> dims(image.getArray().getShape().reverse());
-    createImageImpl(scale.bitpix, 2, dims.elems);
+    createImageImpl(scale.bitpix == 0 ? detail::Bitpix<T>::value : scale.bitpix, 2, dims.elems);
 
+    // Write the header
+    std::shared_ptr<daf::base::PropertyList> wcsMetadata =
+        image::detail::createTrivialWcsAsPropertySet(image::detail::wcsNameForXY0,
+                                                     image.getX0(), image.getY0());
+    if (header) {
+        std::shared_ptr<daf::base::PropertySet> copy = header->deepCopy();
+        copy->combine(wcsMetadata);
+        header = copy;
+    } else {
+        header = wcsMetadata;
+    }
     writeMetadata(*header);
 
+    // Scale the image how we want it on disk
     ndarray::Array<T const, 2, 2> array = makeContiguousArray(image.getArray());
     std::shared_ptr<detail::PixelArrayBase> pixels = scale.toDisk(array, options.scaling.fuzz,
                                                                   options.scaling.seed);
@@ -952,19 +979,26 @@ void Fits::writeImage(
     // We only want cfitsio to do the scale and zero if the type conversion requires it (e.g., input type is
     // an unsigned integer type).  In all other cases, we have already converted the image to use the
     // appropriate scale and zero (because we want to fuzz the numbers in the quantisation).
-    fits_set_bscale(fits, 1.0, scale.bitpix, &status);
+    fits_set_bscale(fits, 1.0, 0.0, &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Setting bscale,bzero");
+    }
 
-    if (isfinite(scale.bzero) && isfinite(scale.bscale) && (scale.bscale != 0.0)) {
+    // Write the pixels
+    int const fitsType = scale.bitpix == 0 ? FitsType<T>::CONSTANT : fitsTypeForBitpix(scale.bitpix);
+    fits_write_img(fits, fitsType, 1, pixels->getNum(), pixels->getData(), &status);
+    if (behavior & AUTO_CHECK) {
+        LSST_FITS_CHECK_STATUS(*this, "Writing image");
+    }
+
+    if (std::isfinite(scale.bzero) && std::isfinite(scale.bscale) && (scale.bscale != 0.0)) {
         fits_write_key_dbl(fits, "BZERO", scale.bzero, 12,
                            "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
         fits_write_key_dbl(fits, "BSCALE", scale.bscale, 12,
                            "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
-    }
-
-    // Write the pixels
-    fits_write_img(fits, FitsType<T>::CONSTANT, 1, pixels->getNum(), pixels->getData(), &status);
-    if (behavior & AUTO_CHECK) {
-        LSST_FITS_CHECK_STATUS(*this, "Writing image");
+        if (behavior & AUTO_CHECK) {
+            LSST_FITS_CHECK_STATUS(*this, "Writing BSCALE,BZERO");
+        }
     }
 
 #if 1
@@ -1228,7 +1262,7 @@ bool Fits::checkCompressedImagePhu() {
     template void Fits::writeImageImpl(T const *, int);                  \
     template void Fits::writeImage(image::ImageBase<T> const&, \
                                    ImageWriteOptions const&, \
-                                   std::shared_ptr<daf::base::PropertyList const>, \
+                                   std::shared_ptr<daf::base::PropertySet const>, \
                                    std::shared_ptr<image::Mask<image::MaskPixel> const>); \
     template void Fits::readImageImpl(int, T *, long *, long *, long *); \
     template bool Fits::checkImageType<T>();                             \

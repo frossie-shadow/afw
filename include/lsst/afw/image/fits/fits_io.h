@@ -104,17 +104,7 @@ inline void fits_write_image(
     std::shared_ptr<daf::base::PropertySet const> metadata=std::shared_ptr<daf::base::PropertySet const>(),
     std::shared_ptr<Mask<MaskPixel> const> mask=std::shared_ptr<Mask<MaskPixel> const>()
 ) {
-#if 0
-    fitsfile.createImage<typename ImageT::Pixel>(image.getArray().getShape());
-    if (metadata) {
-        fitsfile.writeMetadata(*metadata);
-    }
-    fitsfile.writeImage(image.getArray());
-#else
-    std::shared_ptr<daf::base::PropertyList const> header =
-        std::static_pointer_cast<daf::base::PropertyList const>(metadata);
-    fitsfile.writeImage(image, options, header, mask);
-#endif
+    fitsfile.writeImage(image, options, metadata, mask);
 }
 
 }

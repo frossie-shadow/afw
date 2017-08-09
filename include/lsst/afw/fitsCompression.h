@@ -28,6 +28,10 @@ template <typename T>
 struct Bitpix;
 
 template <>
+struct Bitpix<std::uint8_t> {
+    static int const value = 8;
+};
+template <>
 struct Bitpix<std::int16_t> {
     static int const value = 16;
 };
@@ -38,11 +42,6 @@ struct Bitpix<std::int32_t> {
 template <>
 struct Bitpix<std::int64_t> {
     static int const value = 64;
-};
-#if 0
-template <>
-struct Bitpix<std::uint8_t> {
-    static int const value = 8;
 };
 template <>
 struct Bitpix<std::uint16_t> {
@@ -56,7 +55,6 @@ template <>
 struct Bitpix<std::uint64_t> {
     static int const value = 64;
 };
-#endif
 template <>
 struct Bitpix<float> {
     static int const value = -32;
@@ -106,12 +104,15 @@ template <typename T>
 class PixelArray : public PixelArrayBase {
   public:
     PixelArray(std::size_t num)
-      : PixelArrayBase(num), _pixels(reinterpret_cast<PixelT *>(new T [num])) {}
+      : PixelArrayBase(num),
+        _pixels(reinterpret_cast<PixelT *>(new typename std::remove_const<T>::type [num])) {}
 
     template <typename U>
-    PixelArray(ndarray::ArrayRef<U, 1, 1> const& array)
-      : PixelArrayBase(array.getNumElements()), _pixels(reinterpret_cast<PixelT *>(new T [getNum()])) {
-        std::copy(array.begin(), array.end(), reinterpret_cast<T *>(_pixels));
+    PixelArray(ndarray::Array<U, 1, 1> const& array)
+      : PixelArrayBase(array.getNumElements()),
+        _pixels(reinterpret_cast<PixelT *>(new typename std::remove_const<T>::type [getNum()])) {
+        std::copy(array.begin(), array.end(),
+                  reinterpret_cast<typename std::remove_const<T>::type *>(_pixels));
     }
 
     virtual ~PixelArray() {
@@ -127,11 +128,12 @@ class PixelArray : public PixelArrayBase {
 
 inline std::shared_ptr<PixelArrayBase> makePixelArray(int bitpix, int num) {
     switch (bitpix) {
+      case 8: return std::make_shared<PixelArray<std::uint8_t>>(num);
       case 16: return std::make_shared<PixelArray<std::int16_t>>(num);
       case 32: return std::make_shared<PixelArray<std::int32_t>>(num);
       case 64: return std::make_shared<PixelArray<std::int64_t>>(num);
-//      case -32: return std::make_shared<PixelArray<boost::float32_t>>(num);
-//      case -64: return std::make_shared<PixelArray<boost::float64_t>>(num);
+      case -32: return std::make_shared<PixelArray<boost::float32_t>>(num);
+      case -64: return std::make_shared<PixelArray<boost::float64_t>>(num);
       default:
         std::ostringstream os;
         os << "Unrecognized bitpix: " << bitpix;
@@ -142,9 +144,11 @@ inline std::shared_ptr<PixelArrayBase> makePixelArray(int bitpix, int num) {
 template <typename T>
 std::shared_ptr<PixelArrayBase> makePixelArray(
     int bitpix,
-    ndarray::ArrayRef<T, 1, 1> const& array
+    ndarray::Array<T, 1, 1> const& array
 ) {
     switch (bitpix) {
+      case 0: return std::make_shared<PixelArray<T>>(array);
+      case 8: return std::make_shared<PixelArray<std::uint8_t>>(array);
       case 16: return std::make_shared<PixelArray<std::int16_t>>(array);
       case 32: return std::make_shared<PixelArray<std::int32_t>>(array);
       case 64: return std::make_shared<PixelArray<std::int64_t>>(array);
@@ -247,7 +251,7 @@ class ImageScale {
     ) const;
 
     template <typename T>
-    ndarray::Array<T, 2, 2> fromDisk(ndarray::Array<T const, 2, 2> const& image) const;
+    ndarray::Array<T, 2, 2> fromDisk(ndarray::Array<T, 2, 2> const& image) const;
 };
 
 
@@ -272,7 +276,9 @@ class ImageScalingOptions {
     double bscale, bzero;               ///< Manually specified BSCALE and BZERO (for SCALE_MANUAL)
 
     // Disable scaling by default
-    ImageScalingOptions() : scheme(NONE) {}
+    explicit ImageScalingOptions()
+      : scheme(NONE), bitpix(0), fuzz(false), seed(1), quantizeLevel(4.0), quantizePad(5.0),
+        bscale(std::numeric_limits<double>::quiet_NaN()), bzero(std::numeric_limits<double>::quiet_NaN()) {}
 
     ImageScalingOptions(
         ScalingScheme scheme_,
@@ -303,9 +309,10 @@ class ImageScalingOptions {
     template <typename T, int N>
     ImageScale determine(
         ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool const, N, N> const& mask
+        ndarray::Array<bool, N, N> const& mask
     ) const;
 
+#if 0
     template <typename T>
     std::shared_ptr<detail::PixelArrayBase> apply(
         image::ImageBase<T> const& image,
@@ -318,15 +325,16 @@ class ImageScalingOptions {
 
     template <typename T, int N>
     std::shared_ptr<detail::PixelArrayBase> apply(
-        ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool const, N, N> const& mask
+        ndarray::Array<T, N, N> const& image,
+        ndarray::Array<bool, N, N> const& mask
     ) const {
         return determine(image, mask).toDisk(image, fuzz, seed);
     }
+#endif
 
   private:
     template <typename T>
-    std::pair<ndarray::Array<T const, 2, 2>, ndarray::Array<bool const, 2, 2>> _toArray(
+    std::pair<ndarray::Array<T const, 2, 2>, ndarray::Array<bool, 2, 2>> _toArray(
         image::ImageBase<T> const& image,
         std::shared_ptr<image::Mask<image::MaskPixel> const> mask=
             std::shared_ptr<image::Mask<image::MaskPixel>>()
@@ -353,12 +361,13 @@ class ImageScalingOptions {
     template <typename T, int N>
     ImageScale determineFromRange(
         ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool const, N, N> const& mask
+        ndarray::Array<bool, N, N> const& mask,
+        bool isUnsigned=false
     ) const;
     template <typename T, int N>
     ImageScale determineFromStdev(
         ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool const, N, N> const& mask
+        ndarray::Array<bool, N, N> const& mask
     ) const;
 
 };

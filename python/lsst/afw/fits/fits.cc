@@ -55,13 +55,14 @@ void defineImageCompression(py::module & mod) {
     py::enum_<ImageCompressionOptions::CompressionScheme> scheme(cls, "CompressionScheme");
     scheme.value("NONE", ImageCompressionOptions::CompressionScheme::NONE);
     scheme.value("GZIP", ImageCompressionOptions::CompressionScheme::GZIP);
-    scheme.value("GZIP", ImageCompressionOptions::CompressionScheme::GZIP_SHUFFLE);
+    scheme.value("GZIP_SHUFFLE", ImageCompressionOptions::CompressionScheme::GZIP_SHUFFLE);
     scheme.value("RICE", ImageCompressionOptions::CompressionScheme::RICE);
     scheme.value("PLIO", ImageCompressionOptions::CompressionScheme::PLIO);
     scheme.export_values();
 
-    cls.def(py::init<ImageCompressionOptions::CompressionScheme, ImageCompressionOptions::Tiles, int>(),
+    cls.def(py::init<ImageCompressionOptions::CompressionScheme, ImageCompressionOptions::Tiles, float>(),
             "scheme"_a, "tiles"_a, "quantizeLevel"_a=0.0);
+    cls.def(py::init<ImageCompressionOptions::CompressionScheme, float>(), "scheme"_a, "quantizeLevel"_a=0.0);
 
     cls.def(py::init<lsst::afw::image::Image<unsigned char> const&>());
     cls.def(py::init<lsst::afw::image::Image<unsigned short> const&>());
@@ -86,12 +87,12 @@ void defineImageCompression(py::module & mod) {
 template <typename T>
 void defineImageScalingOptionsTemplates(py::class_<ImageScalingOptions> & cls) {
     cls.def("determine", &ImageScalingOptions::determine<T>);
-    cls.def("apply", &ImageScalingOptions::apply<T>);
+//    cls.def("apply", &ImageScalingOptions::apply<T>);
 }
 
 void defineImageScalingOptions(py::module & mod) {
     py::class_<ImageScalingOptions> cls(mod, "ImageScalingOptions");
-    py::enum_<ImageScalingOptions::ScalingScheme> scheme(cls, "CompressionScheme");
+    py::enum_<ImageScalingOptions::ScalingScheme> scheme(cls, "ScalingScheme");
     scheme.value("NONE", ImageScalingOptions::ScalingScheme::NONE);
     scheme.value("RANGE", ImageScalingOptions::ScalingScheme::RANGE);
     scheme.value("STDEV_POSITIVE", ImageScalingOptions::ScalingScheme::STDEV_POSITIVE);
@@ -232,6 +233,11 @@ PYBIND11_PLUGIN(_fits) {
             }, "fileName"_a, "hdu"_a=INT_MIN, "strip"_a=false);
     mod.def("setAllowImageCompression", &setAllowImageCompression, "allow"_a);
     mod.def("getAllowImageCompression", &getAllowImageCompression);
+
+    mod.def("compressionSchemeFromString", &compressionSchemeFromString);
+    mod.def("compressionSchemeToString", &compressionSchemeToString);
+    mod.def("scalingSchemeFromString", &scalingSchemeFromString);
+    mod.def("scalingSchemeToString", &scalingSchemeToString);
 
     return mod.ptr();
 }

@@ -79,7 +79,7 @@ ImageCompressionOptions::ImageCompressionOptions(
     int quantizeLevel_
 ) : scheme(scheme_), quantizeLevel(quantizeLevel_) {
     tiles = ndarray::allocate(MAX_COMPRESS_DIM);
-    tiles[0] = 1;
+    tiles[0] = 64;
     for (int ii = 1; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = 1;
 }
 
@@ -116,7 +116,7 @@ namespace {
 template <typename T, int N>
 std::pair<T, T> calculateMedianStdev(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool const, N, N> const& mask
+    ndarray::Array<bool, N, N> const& mask
 ) {
     std::size_t num = 0;
     auto const& flatMask = ndarray::flatten<1>(mask);
@@ -153,9 +153,10 @@ std::pair<T, T> calculateMedianStdev(
 template <typename T, int N>
 ImageScale ImageScalingOptions::determineFromRange(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool const, N, N> const& mask
+    ndarray::Array<bool, N, N> const& mask,
+    bool isUnsigned
 ) const {
-    double const range = std::pow(2.0, bitpix); // Range of values for target BITPIX
+    double const range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
     T min = std::numeric_limits<T>::max(), max = std::numeric_limits<T>::min();
     auto mm = ndarray::flatten<1>(mask).begin();
     auto const& flatImage = ndarray::flatten<1>(image);
@@ -166,14 +167,15 @@ ImageScale ImageScalingOptions::determineFromRange(
         if (*ii < min) min = *ii;
     }
     if (min == max) return ImageScale(bitpix, 1.0, min);
-    double bscale = (max - min)/range;
-    return ImageScale(bitpix, bscale, min + 0.5*range*bscale);
+    double const bscale = (max - min)/range;
+    double const bzero = isUnsigned ? min : min + 0.5*range*bscale;
+    return ImageScale(bitpix, bscale, bzero);
 }
 
 template <typename T, int N>
 ImageScale ImageScalingOptions::determineFromStdev(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool const, N, N> const& mask
+    ndarray::Array<bool, N, N> const& mask
 ) const {
     auto stats = calculateMedianStdev(image, mask);
     auto const median = stats.first, stdev = stats.second;
@@ -201,18 +203,35 @@ ImageScale ImageScalingOptions::determineFromStdev(
     }
 
     double const bscale = stdev/quantizeLevel;
-    return ImageScale(bitpix, bscale, imageVal - bscale*diskVal);
+    double const bzero = imageVal - bscale*diskVal;
+    return ImageScale(bitpix, bscale, bzero);
 }
+
+template <typename T, class Enable=void>
+struct Bzero {
+    static double constexpr value = 0.0;
+};
+
+// Unsigned integer version
+template <typename T>
+struct Bzero<T, typename std::enable_if<std::numeric_limits<T>::is_integer &&
+                                        !std::numeric_limits<T>::is_signed>::type> {
+    static double constexpr value = std::numeric_limits<T>::max() >> 1;
+};
 
 
 template <typename T, int N>
 ImageScale ImageScalingOptions::determine(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool const, N, N> const& mask
+    ndarray::Array<bool, N, N> const& mask
 ) const {
+    if (std::is_integral<T>::value && (bitpix != 0 || bitpix != detail::Bitpix<T>::value) && scheme != NONE) {
+        throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
+                          "Image scaling not supported for integral types");
+    }
     switch (scheme) {
-      case NONE: return ImageScale(0, 1.0, 0.0);
-      case RANGE: return determineFromRange(image, mask);
+      case NONE: return ImageScale(detail::Bitpix<T>::value, 1.0, Bzero<T>::value);
+      case RANGE: return determineFromRange(image, mask, bitpix == 8);
       case ImageScalingOptions::STDEV_POSITIVE:
       case ImageScalingOptions::STDEV_NEGATIVE:
       case ImageScalingOptions::STDEV_BOTH:
@@ -229,8 +248,9 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk(
     bool fuzz,
     unsigned long seed
 ) const {
-    if (bitpix <= 0 || (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
-        return detail::makePixelArray(bitpix, ndarray::flatten<1>(image));
+    if (bitpix < 0 || (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
+        // Type conversion only
+        return detail::makePixelArray(bitpix, ndarray::Array<T const, 1, 1>(ndarray::flatten<1>(image)));
     }
 
     math::Random rng(math::Random::MT19937, seed);
@@ -258,15 +278,18 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk(
             value += rng.uniform();
         }
         // Check for underflow and overflow; set either to max
-        *outIter = (value < min || value > max ? max : std::floor(value));
+        if (value < min || value > max) {
+        }
+        *outIter = (value < min ? min : value > max ? max : std::floor(value));
     }
 
-    return detail::makePixelArray(bitpix, num);
+    return detail::makePixelArray(bitpix, out);
+
 }
 
 
 template <typename T>
-ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T const, 2, 2> const& image) const {
+ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T, 2, 2> const& image) const {
     ndarray::Array<T, 2, 2> memory = ndarray::allocate(image.getShape());
     memory.deep() = bscale*image + bzero;
     return memory;
@@ -276,13 +299,13 @@ ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T const, 2, 2> const
 // Explicit instantiation
 #define INSTANTIATE(TYPE) \
     template ImageScale ImageScalingOptions::determine<TYPE, 2>( \
-        ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool const, 2, 2> const& mask) const; \
-    template std::shared_ptr<detail::PixelArrayBase> ImageScalingOptions::apply<TYPE, 2>( \
-        ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool const, 2, 2> const& mask) const; \
+        ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const; \
     template std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk<TYPE>( \
         ndarray::Array<TYPE const, 2, 2> const&, bool, unsigned long) const; \
     template ndarray::Array<TYPE, 2, 2> ImageScale::fromDisk<TYPE>( \
-        ndarray::Array<TYPE const, 2, 2> const&) const; \
+        ndarray::Array<TYPE, 2, 2> const&) const;
+//    template std::shared_ptr<detail::PixelArrayBase> ImageScalingOptions::apply<TYPE, 2>( \
+//        ndarray::Array<TYPE, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const;
 
 INSTANTIATE(std::uint8_t);
 INSTANTIATE(std::uint16_t);

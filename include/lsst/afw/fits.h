@@ -412,7 +412,7 @@ public:
     void writeImage(
         image::ImageBase<T> const& image,
         ImageWriteOptions const& options,
-        std::shared_ptr<daf::base::PropertyList const> header=std::shared_ptr<daf::base::PropertyList>(),
+        std::shared_ptr<daf::base::PropertySet const> header=std::shared_ptr<daf::base::PropertyList>(),
         std::shared_ptr<image::Mask<image::MaskPixel> const> mask=
             std::shared_ptr<image::Mask<image::MaskPixel>>()
     );
