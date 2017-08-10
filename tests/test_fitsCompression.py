@@ -21,7 +21,6 @@
 #
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 
 import os
 import unittest
@@ -40,22 +39,53 @@ from lsst.afw.fits import ImageScalingOptions, ImageCompressionOptions
 
 
 class ImageScalingTestCase(lsst.utils.tests.TestCase):
+    """Tests of image scaling
+
+    The pattern here is to create an image, write it out with a
+    specific scaling scheme, read it back in and test that everything
+    is as we expect. We do this for each scaling scheme in its own
+    test, and within that test iterate over various parameters (input
+    image type, BITPIX, etc.). The image we create has a few features
+    (low, high and masked pixels) that we check.
+    """
     def setUp(self):
         self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(7, 8))
-        self.base = 456
-        self.highValue = 789
-        self.lowValue = 123
-        self.maskedValue = 123456
-        self.highPixel = (1, 1)
-        self.lowPixel = (2, 2)
-        self.maskedPixel = (3, 3)
-        self.badMask = "BAD"
-        self.stdev = 5.0
-
-    def tearDown(self):
-        del self.bbox
+        self.base = 456  # Base value for pixels
+        self.highValue = 789  # Value for high pixel
+        self.lowValue = 123  # Value for low pixel
+        self.maskedValue = 123456  # Value for masked pixel (to throw off statistics)
+        self.highPixel = (1, 1)  # Location of high pixel
+        self.lowPixel = (2, 2)  # Location of low pixel
+        self.maskedPixel = (3, 3)  # Location of masked pixel
+        self.badMask = "BAD"  # Mask plane to set for masked pixel
+        self.stdev = 5.0  # Noise stdev to add to image
 
     def makeImage(self, ImageClass, scaling, addNoise=True):
+        """Make an image for testing
+
+        We create an image, persist and unpersist it, returning
+        some data to the caller.
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        scaling : `lsst.afw.fits.ImageScalingOptions`
+            Scaling to apply during persistence.
+        addNoise : `bool`
+            Add noise to image?
+
+        Returns
+        -------
+        image : `lsst.afw.image.Image` (ImageClass)
+            Created image.
+        unpersisted : `lsst.afw.image.Image` (ImageClass)
+            Unpersisted image.
+        bscale, bzero : `float`
+            FITS scale factor and zero used.
+        minValue, maxValue : `float`
+            Minimum and maximum value given the nominated scaling.
+        """
         image = ImageClass(self.bbox)
         mask = lsst.afw.image.Mask(self.bbox)
         bad = mask.getPlaneBitMask(self.badMask)
@@ -82,7 +112,8 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
             bscale = header.get("BSCALE")
             bzero = header.get("BZERO")
 
-            self.assertEqual(header.get("BITPIX"), scaling.bitpix)
+            if scaling.scheme != ImageScalingOptions.NONE:
+                self.assertEqual(header.get("BITPIX"), scaling.bitpix)
 
             if scaling.bitpix == 8:  # unsigned, says FITS
                 maxValue = bscale*(2**scaling.bitpix) - 1 + bzero
@@ -94,10 +125,41 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         return image, unpersisted, bscale, bzero, minValue, maxValue
 
     def checkPixel(self, unpersisted, original, xy, expected, rtol=None, atol=None):
+        """Check one of the special pixels
+
+        After checking, we set this pixel to the original value so
+        it's then easy to compare the entire image.
+
+        Parameters
+        ----------
+        unpersisted : `lsst.afw.image.Image`
+            Unpersisted image.
+        original : `lsst.afw.image.Image`
+            Original image.
+        xy : `tuple` of two `int`s
+            Position of pixel to check.
+        expected : scalar
+            Expected value of pixel.
+        rtol, atol : `float` or `None`
+            Relative/absolute tolerance for comparison.
+        """
         self.assertFloatsAlmostEqual(unpersisted.get(*xy), expected, rtol=rtol, atol=atol)
         unpersisted.set(xy[0], xy[1], original.get(*xy))  # for ease of comparison of the whole image
 
     def checkSpecialPixels(self, original, unpersisted, maxValue, minValue, rtol=None, atol=None):
+        """Check the special pixels
+
+        Parameters
+        ----------
+        original : `lsst.afw.image.Image`
+            Original image.
+        unpersisted : `lsst.afw.image.Image`
+            Unpersisted image.
+        minValue, maxValue : `float`
+            Minimum and maximum value given the nominated scaling.
+        rtol, atol : `float` or `None`
+            Relative/absolute tolerance for comparison.
+        """
         highValue = original.get(*self.highPixel)
         lowValue = original.get(*self.lowPixel)
         maskedValue = original.get(*self.maskedPixel)
@@ -111,7 +173,15 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         self.checkPixel(unpersisted, original, self.maskedPixel, expectMasked, rtol=rtol, atol=atol)
 
     def checkRange(self, ImageClass, bitpix):
-        print(ImageClass, bitpix)
+        """Check that the RANGE scaling works
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        bitpix : `int`
+            Bits per pixel for FITS image.
+        """
         scaling = ImageScalingOptions(ImageScalingOptions.RANGE, bitpix, [u"BAD"], fuzz=False)
         original, unpersisted, bscale, bzero, minValue, maxValue = self.makeImage(ImageClass, scaling, False)
 
@@ -122,9 +192,18 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         self.checkSpecialPixels(original, unpersisted, maxValue, minValue, rtol=rtol)
         self.assertImagesAlmostEqual(original, unpersisted, rtol=rtol)
 
-    def checkStdev(self, ImageClass, bitpix, scheme, addNoise=True):
-        print(ImageClass, bitpix, scheme)
+    def checkStdev(self, ImageClass, bitpix, scheme):
+        """Check that one of the STDEV scaling schemes work
 
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        bitpix : `int`
+            Bits per pixel for FITS image.
+        scheme : `lsst.afw.fits.ImageScalingOptions.ScalingScheme`
+            Scaling scheme to apply (one of the STDEV_*).
+        """
         quantizeLevel = 100.0
         quantizePad = 5.0
         scaling = lsst.afw.fits.ImageScalingOptions(scheme, bitpix, [u"BAD"], fuzz=False,
@@ -150,16 +229,26 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         self.assertImagesAlmostEqual(original, unpersisted, atol=atol)
 
     def testRange(self):
+        """Test that the RANGE scaling works on floating-point inputs
+
+        We deliberately don't include BITPIX=64 because int64 provides
+        a larger dynamic range than 'double BSCALE' can handle.
+        """
         classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
-        # NOT including BITPIX=64: provides larger dynamic range than 'double BSCALE' can handle
         bitpixList = (8, 16, 32)
         for cls, bitpix in itertools.product(classList, bitpixList):
             self.checkRange(cls, bitpix)
 
     def testStdev(self):
+        """Test that the STDEV scalings work on floating-point inputs
+
+        We deliberately don't include BITPIX=64 because int64 provides
+        a larger dynamic range than 'double BSCALE' can handle.
+
+        We deliberately don't include BITPIX=8 because that provides
+        only a tiny dynamic range where everything goes out of range easily.
+        """
         classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
-        # NOT including BITPIX=64: provides larger dynamic range than 'double BSCALE' can handle
-        # NOT including BITPIX=8: tiny dynamic range means everything goes out of range easily
         bitpixList = (16, 32)
         schemeList = (ImageScalingOptions.STDEV_POSITIVE, ImageScalingOptions.STDEV_NEGATIVE,
                       ImageScalingOptions.STDEV_BOTH)
@@ -167,6 +256,7 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
             self.checkStdev(cls, bitpix, scheme)
 
     def testRangeFailures(self):
+        """Test that the RANGE scaling fails on integer inputs"""
         classList = (lsst.afw.image.ImageU, lsst.afw.image.ImageI, lsst.afw.image.ImageL)
         bitpixList = (8, 16, 32)
         for cls, bitpix in itertools.product(classList, bitpixList):
@@ -174,25 +264,100 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
                 self.checkRange(cls, bitpix)
 
     def testStdevFailures(self):
+        """Test that the STDEV scalings fail on integer inputs"""
         classList = (lsst.afw.image.ImageU, lsst.afw.image.ImageI, lsst.afw.image.ImageL)
         bitpixList = (16, 32)
         schemeList = (ImageScalingOptions.STDEV_POSITIVE, ImageScalingOptions.STDEV_NEGATIVE,
                       ImageScalingOptions.STDEV_BOTH)
         for cls, bitpix, scheme in itertools.product(classList, bitpixList, schemeList):
             with self.assertRaises(lsst.pex.exceptions.InvalidParameterError):
-                # Adding noise to integer image results in:
-                #     TypeError: Cannot cast ufunc add output from dtype('float64') to
-                #     dtype('uint16') with casting rule 'same_kind'
-                self.checkStdev(cls, bitpix, scheme, addNoise=False)
+                self.checkStdev(cls, bitpix, scheme)
+
+    def checkNone(self, ImageClass, bitpix):
+        """Check that the NONE scaling scheme works
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        bitpix : `int`
+            Bits per pixel for FITS image.
+        """
+        scaling = ImageScalingOptions(ImageScalingOptions.NONE, bitpix, [u"BAD"], fuzz=False)
+        original, unpersisted, bscale, bzero, minValue, maxValue = self.makeImage(ImageClass, scaling)
+        self.assertFloatsAlmostEqual(bscale, 1.0, atol=0.0)
+        self.assertFloatsAlmostEqual(bzero, 0.0, atol=0.0)
+        self.assertImagesAlmostEqual(original, unpersisted, atol=0.0)
+
+    def testNone(self):
+        """Test that the NONE scaling works on floating-point inputs"""
+        classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
+        bitpixList = (8, 16, 32)
+        for cls, bitpix in itertools.product(classList, bitpixList):
+            self.checkNone(cls, bitpix)
+
+    def checkManual(self, ImageClass, bitpix):
+        """Check that the MANUAL scaling scheme works
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        bitpix : `int`
+            Bits per pixel for FITS image.
+        """
+        bscaleSet = 1.2345
+        bzeroSet = self.base
+        scaling = ImageScalingOptions(ImageScalingOptions.MANUAL, bitpix, [u"BAD"], bscale=bscaleSet,
+                                      bzero=bzeroSet, fuzz=False)
+        original, unpersisted, bscale, bzero, minValue, maxValue = self.makeImage(ImageClass, scaling)
+        self.assertFloatsAlmostEqual(bscale, bscaleSet, atol=0.0)
+        self.assertFloatsAlmostEqual(bzero, bzeroSet, atol=0.0)
+        self.assertImagesAlmostEqual(original, unpersisted, atol=bscale)
+
+    def testManual(self):
+        """Test that the MANUAL scaling works on floating-point inputs"""
+        classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
+        bitpixList = (16, 32)
+        for cls, bitpix in itertools.product(classList, bitpixList):
+            self.checkNone(cls, bitpix)
 
 
 class ImageCompressionTestCase(lsst.utils.tests.TestCase):
+    """Tests of image compression
+
+    We test compression both with and without loss (quantisation/scaling).
+
+    The pattern here is to create an image, write it out with a
+    specific compression scheme, read it back in and test that everything
+    is as we expect. We do this for each compression scheme in its own
+    test, and within that test iterate over various parameters (input
+    image type, BITPIX, etc.).
+
+    We print the (inverse) compression ratio for interest. Note that
+    these should not be considered to be representative of the
+    compression that will be achieved on scientific data, since the
+    images created here have different qualities than scientific data
+    that will affect the compression ratio (e.g., size, noise properties).
+    """
     def setUp(self):
         self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(78, 90))
-        self.background = 12345.6789
-        self.noise = 67.89
+        self.background = 12345.6789  # Background value
+        self.noise = 67.89  # Noise (stdev)
 
     def makeImage(self, ImageClass):
+        """Create an image
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+
+        Returns
+        -------
+        image : `ImageClass`
+            The created image.
+        """
         image = ImageClass(self.bbox)
         rng = np.random.RandomState(12345)
         dtype = image.getArray().dtype
@@ -201,15 +366,38 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         return image
 
     def makeMask(self):
+        """Create a mask
+
+        Note that we generate a random distribution of mask pixel values,
+        which is very different from the usual distribution in science images.
+
+        Returns
+        -------
+        mask : `lsst.afw.image.Mask`
+            The created mask.
+        """
         mask = lsst.afw.image.Mask(self.bbox)
         rng = np.random.RandomState(12345)
         dtype = mask.getArray().dtype
-        # Note: this is not the usual distribution of mask pixel values, so the compression factors
-        # we get here will not be indicative of what we will get in practise.
         mask.getArray()[:] = rng.randint(0, 2**(dtype.itemsize*8 - 1), mask.getArray().shape, dtype=dtype)
         return mask
 
     def checkCompressedImage(self, ImageClass, image, compression, scaling=None, atol=0.0):
+        """Check that compression works on an image
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image.
+        image : `lsst.afw.image.Image`
+            Image to compress.
+        compression : `lsst.afw.fits.ImageCompressionOptions`
+            Compression parameters.
+        scaling : `lsst.afw.fits.ImageScalingOptions` or `None`
+            Scaling parameters for lossy compression (optional).
+        atol : `float`
+            Absolute tolerance for comparing unpersisted image.
+        """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
             with lsst.afw.fits.Fits(filename, "w") as fits:
                 if scaling:
@@ -228,6 +416,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.assertImagesAlmostEqual(unpersisted, image, atol=atol)
 
     def testLosslessFloat(self):
+        """Test lossless compression of floating-point image"""
         classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
         schemeList = ("GZIP", "GZIP_SHUFFLE")  # Lossless float compression requires GZIP
         for cls, scheme in itertools.product(classList, schemeList):
@@ -236,7 +425,11 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(cls, image, compression, atol=0.0)
 
     def testLosslessInt(self):
-        # Compression of ImageL is unsupported by cfitsio
+        """Test lossless compression of integer image
+
+        We deliberately don't test `lsst.afw.image.ImageL` because
+        compression of LONGLONG images is unsupported by cfitsio.
+        """
         classList = (lsst.afw.image.ImageU, lsst.afw.image.ImageI)
         schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
         for cls, scheme in itertools.product(classList, schemeList):
@@ -255,7 +448,12 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(cls, image, compression, atol=0.0)
 
     def testMask(self):
-        # Default mask type (32 bits) is out of range for PLIO (24 bits)
+        """Test compression of mask
+
+        We deliberately don't test PLIO compression (which is designed for
+        masks) because our default mask type (32) has too much dynamic range
+        for PLIO (limit of 24 bits).
+        """
         for scheme in ("GZIP", "GZIP_SHUFFLE", "RICE"):
             if scheme == "RICE":
                 # cfitsio 3.36 requres the quantizeLevel to be set, even for an integer image, to
@@ -271,7 +469,12 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(lsst.afw.image.Mask, self.makeMask(), compression, atol=0.0)
 
     def testLossyFloatCfitsio(self):
-        # cfitsio lossy float compression is controlled through the quantize_level parameter
+        """Test lossy compresion of floating-point images with cfitsio
+
+        cfitsio does the compression, controlled through the 'quantizeLevel'
+        parameter. Note that cfitsio doesn't have access to our masks when
+        it does its statistics.
+        """
         classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
         schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
         quantizeList = (4.0, 10.0)
@@ -282,7 +485,12 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(cls, image, compression, atol=1.25*self.noise/quantizeLevel)
 
     def testLossyFloatOurs(self):
-        # Our lossy float compression is done by scaling first
+        """Test lossy compression of floating-point images ourselves
+
+        We do lossy compression by scaling first. We have full control over
+        the scaling (multiple scaling schemes), and we have access to our
+        own masks when we do statistics.
+        """
         classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
         schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
         bitpixList = (16, 32)
@@ -298,6 +506,18 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(cls, image, compression, scaling, atol=1.2*self.noise/quantize)
 
     def checkCompressedMaskedImage(self, image, imageOptions, maskOptions, varianceOptions, atol=0.0):
+        """Check that compression works on a MaskedImage
+
+        Parameters
+        ----------
+        image : `lsst.afw.image.MaskedImage`
+            MaskedImage to compress.
+        imageOptions, maskOptions, varianceOptions : `lsst.afw.fits.ImageWriteOptions`
+            Parameters for writing (compression and scaling) the image, mask
+            and variance planes.
+        atol : `float`
+            Absolute tolerance for comparing unpersisted image.
+        """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
             with lsst.afw.fits.Fits(filename, "w") as fits:
                 image.writeFits(fits, imageOptions, maskOptions, varianceOptions)
@@ -311,6 +531,16 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.assertImagesAlmostEqual(unpersisted.getVariance(), image.getVariance(), atol=atol)
 
     def checkMaskedImage(self, imageOptions, maskOptions, varianceOptions, atol=0.0):
+        """Check that we can compress a MaskedImage and Exposure
+
+        Parameters
+        ----------
+        imageOptions, maskOptions, varianceOptions : `lsst.afw.fits.ImageWriteOptions`
+            Parameters for writing (compression and scaling) the image, mask
+            and variance planes.
+        atol : `float`
+            Absolute tolerance for comparing unpersisted image.
+        """
         image = lsst.afw.image.makeMaskedImage(self.makeImage(lsst.afw.image.ImageF),
                                                self.makeMask(), self.makeImage(lsst.afw.image.ImageF))
         self.checkCompressedMaskedImage(image, imageOptions, maskOptions, varianceOptions, atol=atol)
@@ -318,6 +548,10 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         self.checkCompressedMaskedImage(exp, imageOptions, maskOptions, varianceOptions, atol=atol)
 
     def testMaskedImage(self):
+        """Test compression of MaskedImage
+
+        We test lossless, lossy cfitsio and lossy LSST compression.
+        """
         # Lossless
         lossless = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE)
         options = lsst.afw.fits.ImageWriteOptions(lossless)
