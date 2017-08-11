@@ -976,12 +976,17 @@ void Fits::writeImage(
     std::shared_ptr<detail::PixelArrayBase> pixels = scale.toFits(array, options.scaling.fuzz,
                                                                   options.scaling.seed);
 
-    // We only want cfitsio to do the scale and zero if the type conversion requires it (e.g., input type is
-    // an unsigned integer type).  In all other cases, we have already converted the image to use the
-    // appropriate scale and zero (because we want to fuzz the numbers in the quantisation).
-    fits_set_bscale(fits, 1.0, 0.0, &status);
-    if (behavior & AUTO_CHECK) {
-        LSST_FITS_CHECK_STATUS(*this, "Setting bscale,bzero");
+    // We only want cfitsio to do the scale and zero for unsigned 64-bit integer types. For those,
+    // "double bzero" has sufficient precision to represent the appropriate value. We'll let
+    // cfitsio handle it itself.
+    // In all other cases, we will convert the image to use the appropriate scale and zero
+    // (because we want to fuzz the numbers in the quantisation), so we don't want cfitsio
+    // rescaling.
+    if (!std::is_same<T, std::uint64_t>::value) {
+        fits_set_bscale(fits, 1.0, 0.0, &status);
+        if (behavior & AUTO_CHECK) {
+            LSST_FITS_CHECK_STATUS(*this, "Setting bscale,bzero");
+        }
     }
 
     // Write the pixels
@@ -991,7 +996,8 @@ void Fits::writeImage(
         LSST_FITS_CHECK_STATUS(*this, "Writing image");
     }
 
-    if (std::isfinite(scale.bzero) && std::isfinite(scale.bscale) && (scale.bscale != 0.0)) {
+    if (!std::is_same<T, std::int64_t>::value && !std::is_same<T, std::uint64_t>::value &&
+        std::isfinite(scale.bzero) && std::isfinite(scale.bscale) && (scale.bscale != 0.0)) {
         fits_write_key_dbl(fits, "BZERO", scale.bzero, 12,
                            "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
         fits_write_key_dbl(fits, "BSCALE", scale.bscale, 12,

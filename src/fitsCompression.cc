@@ -213,6 +213,14 @@ struct Bzero {
     static double constexpr value = 0.0;
 };
 
+// uint64 version
+// 'double' doesn't have sufficient bits to represent the appropriate BZERO,
+// so let cfitsio handle it.
+template <>
+struct Bzero<std::uint64_t> {
+    static double constexpr value = 0.0;
+};
+
 // Unsigned integer version
 template <typename T>
 struct Bzero<T, typename std::enable_if<std::numeric_limits<T>::is_integer &&
