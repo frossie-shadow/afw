@@ -73,8 +73,6 @@ class ImagePickleTestCase(lsst.utils.tests.TestCase):
 
     def checkImages(self, original):
         image = pickle.loads(pickle.dumps(original))
-        original.writeFits("original.fits")
-        image.writeFits("image.fits")
         self.assertImagesEqual(image, original)
 
     def checkExposures(self, original):
