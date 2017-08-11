@@ -401,7 +401,7 @@ void Image<PixelT>::writeFits(fits::Fits& fitsfile,
     } else {
         metadata = wcsAMetadata;
     }
-    fits_write_image(fitsfile, *this, fits::ImageWriteOptions(*this), metadata);
+    fitsfile.writeImage(*this, fits::ImageWriteOptions(*this), metadata);
 }
 
 template <typename PixelT>
@@ -411,7 +411,7 @@ void Image<PixelT>::writeFits(
     std::shared_ptr<daf::base::PropertySet const> header,
     std::shared_ptr<Mask<MaskPixel> const> mask
 ) const {
-    fits_write_image(fitsfile, *this, options, header, mask);
+    fitsfile.writeImage(*this, options, header, mask);
 }
 
 

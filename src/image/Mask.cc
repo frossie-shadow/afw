@@ -518,7 +518,7 @@ void Mask<MaskPixelT>::writeFits(fits::Fits& fitsfile,
             detail::createTrivialWcsAsPropertySet(detail::wcsNameForXY0, this->getX0(), this->getY0());
     metadata->combine(wcsAMetadata);
 
-    fits_write_image(fitsfile, *this, fits::ImageWriteOptions(*this), metadata);
+    fitsfile.writeImage(*this, fits::ImageWriteOptions(*this), metadata);
 }
 
 template <typename MaskPixelT>
@@ -527,7 +527,7 @@ void Mask<MaskPixelT>::writeFits(
     fits::ImageWriteOptions const& options,
     std::shared_ptr<daf::base::PropertySet const> header
 ) const {
-    fits_write_image(fitsfile, *this, options, header);
+    fitsfile.writeImage(*this, options, header);
 }
 
 

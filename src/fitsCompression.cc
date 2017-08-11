@@ -76,11 +76,12 @@ int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme
 
 ImageCompressionOptions::ImageCompressionOptions(
     ImageCompressionOptions::CompressionScheme scheme_,
+    bool rows,
     int quantizeLevel_
 ) : scheme(scheme_), quantizeLevel(quantizeLevel_) {
     tiles = ndarray::allocate(MAX_COMPRESS_DIM);
-    tiles[0] = 64;
-    for (int ii = 1; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = 1;
+    tiles[0] = 0;
+    for (int ii = 1; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = rows ? 1 : 0;
 }
 
 
@@ -243,7 +244,7 @@ ImageScale ImageScalingOptions::determine(
 
 
 template <typename T>
-std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk(
+std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
     ndarray::Array<T const, 2, 2> const& image,
     bool fuzz,
     unsigned long seed
@@ -289,7 +290,7 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk(
 
 
 template <typename T>
-ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T, 2, 2> const& image) const {
+ndarray::Array<T, 2, 2> ImageScale::fromFits(ndarray::Array<T, 2, 2> const& image) const {
     ndarray::Array<T, 2, 2> memory = ndarray::allocate(image.getShape());
     memory.deep() = bscale*image + bzero;
     return memory;
@@ -300,12 +301,10 @@ ndarray::Array<T, 2, 2> ImageScale::fromDisk(ndarray::Array<T, 2, 2> const& imag
 #define INSTANTIATE(TYPE) \
     template ImageScale ImageScalingOptions::determine<TYPE, 2>( \
         ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const; \
-    template std::shared_ptr<detail::PixelArrayBase> ImageScale::toDisk<TYPE>( \
+    template std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits<TYPE>( \
         ndarray::Array<TYPE const, 2, 2> const&, bool, unsigned long) const; \
-    template ndarray::Array<TYPE, 2, 2> ImageScale::fromDisk<TYPE>( \
+    template ndarray::Array<TYPE, 2, 2> ImageScale::fromFits<TYPE>( \
         ndarray::Array<TYPE, 2, 2> const&) const;
-//    template std::shared_ptr<detail::PixelArrayBase> ImageScalingOptions::apply<TYPE, 2>( \
-//        ndarray::Array<TYPE, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const;
 
 INSTANTIATE(std::uint8_t);
 INSTANTIATE(std::uint16_t);

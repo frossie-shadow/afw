@@ -973,7 +973,7 @@ void Fits::writeImage(
 
     // Scale the image how we want it on disk
     ndarray::Array<T const, 2, 2> array = makeContiguousArray(image.getArray());
-    std::shared_ptr<detail::PixelArrayBase> pixels = scale.toDisk(array, options.scaling.fuzz,
+    std::shared_ptr<detail::PixelArrayBase> pixels = scale.toFits(array, options.scaling.fuzz,
                                                                   options.scaling.seed);
 
     // We only want cfitsio to do the scale and zero if the type conversion requires it (e.g., input type is

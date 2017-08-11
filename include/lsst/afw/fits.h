@@ -182,6 +182,9 @@ private:
 };
 
 
+/// Construct a contiguous ndarray
+///
+/// A deep copy is only performed if the array is not already contiguous.
 template <typename T, int N, int C>
 ndarray::Array<T const, N, N> const makeContiguousArray(ndarray::Array<T, N, C> const& array) {
     ndarray::Array<T const, N, N> contiguous = ndarray::dynamic_dimension_cast<N>(array);
@@ -190,21 +193,30 @@ ndarray::Array<T const, N, N> const makeContiguousArray(ndarray::Array<T, N, C> 
 }
 
 
-/// Options for writing an image
+/// Options for writing an image to FITS
+///
+/// An image being written to FITS may be scaled (quantised) and/or
+/// compressed. This struct is a container for options controlling
+/// each of those separately.
 struct ImageWriteOptions {
-    ImageCompressionOptions compression;
-    ImageScalingOptions scaling;
+    ImageCompressionOptions compression;  ///< Options controlling compression
+    ImageScalingOptions scaling;  ///< Options controlling scaling
 
+    /// Construct with default options for images
     template <typename T>
     ImageWriteOptions(image::Image<T> const& image) : compression(image) {}
+
+    /// Construct with default options for masks
     template <typename T>
     ImageWriteOptions(image::Mask<T> const& mask) : compression(mask) {}
 
+    /// Construct with specific compression and scaling options
     ImageWriteOptions(
         ImageCompressionOptions const& compression_,
         ImageScalingOptions const& scaling_=ImageScalingOptions())
       : compression(compression_), scaling(scaling_) {}
 
+    /// Construct with specific scaling options
     ImageWriteOptions(ImageScalingOptions const& scaling_)
       : compression(ImageCompressionOptions::NONE), scaling(scaling_) {}
 };
@@ -402,12 +414,26 @@ public:
      *  The HDU must already exist and have the correct bitpix.
      *
      *  An extra deep-copy may be necessary if the array is not fully contiguous.
+     *
+     *  No compression or scaling is performed.
      */
     template <typename T, int N, int C>
     void writeImage(ndarray::Array<T const, N, C> const& array) {
         writeImageImpl(makeContiguousArray(array).getData(), array.getNumElements());
     }
 
+    /**
+     *  Write an image to FITS
+     *
+     *  This method is all-inclusive, and covers creating the HDU (with the
+     *  correct BITPIX), writing the header and optional scaling and
+     *  compression of the image.
+     *
+     *  @param[in] image  Image to write to FITS.
+     *  @param[in] options  Options controlling the write (scaling, compression).
+     *  @param[in] header  FITS header to write.
+     *  @param[in] mask  Mask for image (used for statistics when scaling).
+     */
     template <typename T>
     void writeImage(
         image::ImageBase<T> const& image,
@@ -532,9 +558,21 @@ public:
     /// Close a FITS file.
     void closeFile();
 
+    /// Set compression options for writing FITS images
+    ///
+    /// \sa ImageCompressionContext
     void setImageCompression(ImageCompressionOptions const& options);
+
+    /// Return the current image compression settings
     ImageCompressionOptions getImageCompression(int nDim);
 
+    /// Go to the first image header in the FITS file
+    ///
+    /// If a single image is written compressed, it appears as an extension,
+    /// rather than the primary HDU (PHU). This method is useful before reading
+    /// an image, as it checks whether we are positioned on an empty PHU and if
+    /// the next HDU is a compressed image; if so, it leaves the file pointer on
+    /// the compresed image, ready for reading.
     bool checkCompressedImagePhu();
 
     ~Fits() {
@@ -607,7 +645,7 @@ struct ImageCompressionContext {
         std::swap(fits.status, status);
         try {
             fits.setImageCompression(old);
-        } catch (...) {} // swallow all errors
+        } catch (...) {} // swallow all errors: this is the destructor!
         std::swap(fits.status, status);
     }
   private:

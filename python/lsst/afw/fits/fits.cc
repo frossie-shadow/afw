@@ -62,7 +62,8 @@ void defineImageCompression(py::module & mod) {
 
     cls.def(py::init<ImageCompressionOptions::CompressionScheme, ImageCompressionOptions::Tiles, float>(),
             "scheme"_a, "tiles"_a, "quantizeLevel"_a=0.0);
-    cls.def(py::init<ImageCompressionOptions::CompressionScheme, float>(), "scheme"_a, "quantizeLevel"_a=0.0);
+    cls.def(py::init<ImageCompressionOptions::CompressionScheme, bool, float>(), "scheme"_a, "rows"_a=true,
+            "quantizeLevel"_a=0.0);
 
     cls.def(py::init<lsst::afw::image::Image<unsigned char> const&>());
     cls.def(py::init<lsst::afw::image::Image<unsigned short> const&>());
@@ -122,8 +123,8 @@ void defineImageScalingOptions(py::module & mod) {
 
 template <typename T>
 void defineImageScaleTemplates(py::class_<ImageScale> & cls, std::string const& suffix) {
-    cls.def("toDisk", &ImageScale::toDisk<T>, "image"_a, "fuzz"_a=true, "seed"_a=1);
-    cls.def("fromDisk", &ImageScale::fromDisk<T>);
+    cls.def("toFits", &ImageScale::toFits<T>, "image"_a, "fuzz"_a=true, "seed"_a=1);
+    cls.def("fromFits", &ImageScale::fromFits<T>);
 }
 
 void defineImageScale(py::module & mod) {

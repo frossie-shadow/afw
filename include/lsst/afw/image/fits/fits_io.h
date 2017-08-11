@@ -96,17 +96,6 @@ inline void fits_read_array(fits::Fits& fitsfile, ndarray::Array<PixelT, 2, 2>& 
     xy0 += xyOffset;
 }
 
-template <typename ImageT>
-inline void fits_write_image(
-    fits::Fits& fitsfile,
-    ImageT const& image,
-    fits::ImageWriteOptions const& options,
-    std::shared_ptr<daf::base::PropertySet const> metadata=std::shared_ptr<daf::base::PropertySet const>(),
-    std::shared_ptr<Mask<MaskPixel> const> mask=std::shared_ptr<Mask<MaskPixel> const>()
-) {
-    fitsfile.writeImage(image, options, metadata, mask);
-}
-
 }
 }
 }  // namespace lsst::afw::image

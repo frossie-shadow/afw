@@ -440,7 +440,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
                 # error compressing image (413)
                 #   Lossless compression of floating point images must use GZIP (imcomp_init_table)
                 compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
-                                                      1.2345)
+                                                      quantizeLevel=1.2345)
             else:
                 compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme))
 
@@ -462,7 +462,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
                 # error compressing image (413)
                 #   Lossless compression of floating point images must use GZIP (imcomp_init_table)
                 compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
-                                                      1.2345)
+                                                      quantizeLevel=1.2345)
             else:
                 compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme))
 
@@ -480,7 +480,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         quantizeList = (4.0, 10.0)
         for cls, scheme, quantizeLevel in itertools.product(classList, schemeList, quantizeList):
             compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
-                                                  quantizeLevel)
+                                                  quantizeLevel=quantizeLevel)
             image = self.makeImage(cls)
             self.checkCompressedImage(cls, image, compression, atol=1.25*self.noise/quantizeLevel)
 
@@ -499,7 +499,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
                                                                      quantizeList, [False, True]):
             cfitsioQuantize = 1.2345 if scheme == "RICE" else 0.0
             compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
-                                                  cfitsioQuantize)
+                                                  quantizeLevel=cfitsioQuantize)
             scaling = ImageScalingOptions(ImageScalingOptions.STDEV_BOTH, bitpix, quantizeLevel=quantize,
                                           fuzz=fuzz)
             image = self.makeImage(cls)
@@ -559,14 +559,14 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
 
         # Lossy cfitsio compression
         quantize = 4.0
-        cfitsio = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, quantize)
+        cfitsio = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, True, quantize)
         imageOptions = lsst.afw.fits.ImageWriteOptions(cfitsio)
         maskOptions = lsst.afw.fits.ImageWriteOptions(lossless)
         self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.25*self.noise/quantize)
 
         # Lossy our compression
         quantize = 4.0
-        compression = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, 0.0)
+        compression = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, True, 0.0)
         scaling = lsst.afw.fits.ImageScalingOptions(ImageScalingOptions.STDEV_BOTH, 32,
                                                     quantizeLevel=quantize)
         imageOptions = lsst.afw.fits.ImageWriteOptions(compression, scaling)
