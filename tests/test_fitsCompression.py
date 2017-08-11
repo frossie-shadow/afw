@@ -399,17 +399,15 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             Absolute tolerance for comparing unpersisted image.
         """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
-            with lsst.afw.fits.Fits(filename, "w") as fits:
-                if scaling:
-                    options = lsst.afw.fits.ImageWriteOptions(compression, scaling)
-                else:
-                    options = lsst.afw.fits.ImageWriteOptions(compression)
-                header = lsst.daf.base.PropertyList()
-                image.writeFits(fits, options, header)
-                fileSize = os.stat(filename).st_size
-                numBlocks = 1 + np.ceil(self.bbox.getArea()*image.getArray().dtype.itemsize/2880.0)
-                uncompressedSize = 2880*numBlocks
-                print(ImageClass, compression.scheme, fileSize, uncompressedSize, fileSize/uncompressedSize)
+            if scaling:
+                options = lsst.afw.fits.ImageWriteOptions(compression, scaling)
+            else:
+                options = lsst.afw.fits.ImageWriteOptions(compression)
+            image.writeFits(filename, options)
+            fileSize = os.stat(filename).st_size
+            numBlocks = 1 + np.ceil(self.bbox.getArea()*image.getArray().dtype.itemsize/2880.0)
+            uncompressedSize = 2880*numBlocks
+            print(ImageClass, compression.scheme, fileSize, uncompressedSize, fileSize/uncompressedSize)
 
             unpersisted = ImageClass(filename)
             self.assertEqual(image.getBBox(), unpersisted.getBBox())
