@@ -169,8 +169,8 @@ ImageScale ImageScalingOptions::determineFromRange(
         if (*ii < min) min = *ii;
     }
     if (min == max) return ImageScale(bitpix, 1.0, min);
-    double const bscale = (max - min)/range;
-    double const bzero = isUnsigned ? min : min + 0.5*range*bscale;
+    double const bscale = static_cast<T>((max - min)/range);
+    double const bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -204,8 +204,8 @@ ImageScale ImageScalingOptions::determineFromStdev(
         std::abort(); // Programming error: should never get here
     }
 
-    double const bscale = stdev/quantizeLevel;
-    double const bzero = imageVal - bscale*diskVal;
+    double const bscale = static_cast<T>(stdev/quantizeLevel);
+    double const bzero = static_cast<T>(imageVal - bscale*diskVal);
     return ImageScale(bitpix, bscale, bzero);
 }
 

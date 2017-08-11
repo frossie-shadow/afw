@@ -517,8 +517,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             Absolute tolerance for comparing unpersisted image.
         """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
-            with lsst.afw.fits.Fits(filename, "w") as fits:
-                image.writeFits(fits, imageOptions, maskOptions, varianceOptions)
+            image.writeFits(filename, imageOptions, maskOptions, varianceOptions)
             unpersisted = type(image)(filename)
             if hasattr(image, "getMaskedImage"):
                 image = image.getMaskedImage()
