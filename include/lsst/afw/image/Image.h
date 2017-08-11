@@ -240,6 +240,50 @@ public:
     void writeFits(fits::Fits& fitsfile, std::shared_ptr<lsst::daf::base::PropertySet const> metadata =
                                                  std::shared_ptr<lsst::daf::base::PropertySet const>()) const;
 
+    /**
+     *  Write an image to a regular FITS file.
+     *
+     *  @param[in] fileName      Name of the file to write.
+     *  @param[in] options       Options controlling writing of FITS image.
+     *  @param[in] mode          "w"=Create a new file; "a"=Append a new HDU.
+     *  @param[in] header        Additional values to write to the header (may be null).
+     *  @param[in] mask          Mask, for calculation of statistics.
+     */
+    void writeFits(
+        std::string const& filename,
+        fits::ImageWriteOptions const& options,
+        std::string const& mode = "w",
+        std::shared_ptr<daf::base::PropertySet const> header=
+            std::shared_ptr<lsst::daf::base::PropertySet const>(),
+        std::shared_ptr<Mask<MaskPixel> const> mask=std::shared_ptr<Mask<MaskPixel> const>()
+    ) const;
+
+    /**
+     *  Write an image to a FITS RAM file.
+     *
+     *  @param[in] manager       Manager object for the memory block to write to.
+     *  @param[in] options       Options controlling writing of FITS image.
+     *  @param[in] header        Additional values to write to the header (may be null).
+     *  @param[in] mode          "w"=Create a new file; "a"=Append a new HDU.
+     *  @param[in] mask          Mask, for calculation of statistics.
+     */
+    void writeFits(
+        fits::MemFileManager& manager,
+        fits::ImageWriteOptions const& options,
+        std::string const& mode = "w",
+        std::shared_ptr<daf::base::PropertySet const> header=
+            std::shared_ptr<lsst::daf::base::PropertySet const>(),
+        std::shared_ptr<Mask<MaskPixel> const> mask=std::shared_ptr<Mask<MaskPixel> const>()
+    ) const;
+
+    /**
+     *  Write an image to an open FITS file object.
+     *
+     *  @param[in] fitsfile      A FITS file already open to the desired HDU.
+     *  @param[in] options       Options controlling writing of FITS image.
+     *  @param[in] header        Additional values to write to the header (may be null).
+     *  @param[in] mask          Mask, for calculation of statistics.
+     */
     void writeFits(
         fits::Fits& fitsfile,
         fits::ImageWriteOptions const& options,

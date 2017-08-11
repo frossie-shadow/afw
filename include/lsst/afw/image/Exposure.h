@@ -333,6 +333,44 @@ public:
      */
     void writeFits(fits::Fits& fitsfile) const;
 
+    /**
+     *  Write an Exposure to a regular multi-extension FITS file.
+     *
+     *  @param[in] fileName        Name of the file to write.
+     *  @param[in] imageOptions    Options controlling writing of image as FITS.
+     *  @param[in] maskOptions     Options controlling writing of mask as FITS.
+     *  @param[in] varianceOptions Options controlling writing of variance as FITS.
+     */
+    void writeFits(
+        std::string const& fileName,
+        fits::ImageWriteOptions const& imageOptions,
+        fits::ImageWriteOptions const& maskOptions,
+        fits::ImageWriteOptions const& varianceOptions
+   ) const;
+
+    /**
+     *  Write an Exposure to a regular multi-extension FITS file.
+     *
+     *  @param[in] manager         Manager for the memory to write to.
+     *  @param[in] imageOptions    Options controlling writing of image as FITS.
+     *  @param[in] maskOptions     Options controlling writing of mask as FITS.
+     *  @param[in] varianceOptions Options controlling writing of variance as FITS.
+     */
+    void writeFits(
+        fits::MemFileManager& manager,
+        fits::ImageWriteOptions const& imageOptions,
+        fits::ImageWriteOptions const& maskOptions,
+        fits::ImageWriteOptions const& varianceOptions
+   ) const;
+
+    /**
+     *  Write an Exposure to a regular multi-extension FITS file.
+     *
+     *  @param[in] fitsfile        FITS object to which to write.
+     *  @param[in] imageOptions    Options controlling writing of image as FITS.
+     *  @param[in] maskOptions     Options controlling writing of mask as FITS.
+     *  @param[in] varianceOptions Options controlling writing of variance as FITS.
+     */
     void writeFits(
         fits::Fits& fitsfile,
         fits::ImageWriteOptions const& imageOptions,

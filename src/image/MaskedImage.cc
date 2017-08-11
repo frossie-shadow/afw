@@ -520,35 +520,41 @@ void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(
         std::shared_ptr<daf::base::PropertySet const> imageMetadata,
         std::shared_ptr<daf::base::PropertySet const> maskMetadata,
         std::shared_ptr<daf::base::PropertySet const> varianceMetadata) const {
-    std::shared_ptr<daf::base::PropertySet> hdr;
-    if (metadata) {
-        hdr = metadata->deepCopy();
-    } else {
-        hdr.reset(new daf::base::PropertyList());
-    }
-
-    if (fitsfile.countHdus() != 0) {
-        throw LSST_EXCEPT(pex::exceptions::LogicError,
-                          "MaskedImage::writeFits can only write to an empty file");
-    }
-    if (fitsfile.getHdu() < 1) {
-        // Don't ever write images to primary; instead we make an empty primary.
-        fitsfile.createEmpty();
-    } else {
-        fitsfile.setHdu(0);
-    }
-    fitsfile.writeMetadata(*hdr);
-
-    processPlaneMetadata(imageMetadata, hdr, "IMAGE");
-    _image->writeFits(fitsfile, hdr);
-
-    processPlaneMetadata(maskMetadata, hdr, "MASK");
-    _mask->writeFits(fitsfile, hdr);
-
-    processPlaneMetadata(varianceMetadata, hdr, "VARIANCE");
-    _variance->writeFits(fitsfile, hdr);
+    writeFits(fitsfile, fits::ImageWriteOptions(*_image), fits::ImageWriteOptions(*_mask),
+              fits::ImageWriteOptions(*_variance), metadata, imageMetadata, maskMetadata, varianceMetadata);
 }
 
+template <typename ImagePixelT, typename MaskPixelT, typename VariancePixelT>
+void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(
+    std::string const& fileName,
+    fits::ImageWriteOptions const& imageOptions,
+    fits::ImageWriteOptions const& maskOptions,
+    fits::ImageWriteOptions const& varianceOptions,
+    std::shared_ptr<daf::base::PropertySet const> metadata,
+    std::shared_ptr<daf::base::PropertySet const> imageMetadata,
+    std::shared_ptr<daf::base::PropertySet const> maskMetadata,
+    std::shared_ptr<daf::base::PropertySet const> varianceMetadata
+) const {
+    fits::Fits fitsfile(fileName, "w", fits::Fits::AUTO_CLOSE | fits::Fits::AUTO_CHECK);
+    writeFits(fitsfile, imageOptions, maskOptions, varianceOptions, metadata, imageMetadata,
+              maskMetadata, varianceMetadata);
+}
+
+template <typename ImagePixelT, typename MaskPixelT, typename VariancePixelT>
+void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(
+    fits::MemFileManager& manager,
+    fits::ImageWriteOptions const& imageOptions,
+    fits::ImageWriteOptions const& maskOptions,
+    fits::ImageWriteOptions const& varianceOptions,
+    std::shared_ptr<daf::base::PropertySet const> metadata,
+    std::shared_ptr<daf::base::PropertySet const> imageMetadata,
+    std::shared_ptr<daf::base::PropertySet const> maskMetadata,
+    std::shared_ptr<daf::base::PropertySet const> varianceMetadata
+) const {
+    fits::Fits fitsfile(manager, "w", fits::Fits::AUTO_CLOSE | fits::Fits::AUTO_CHECK);
+    writeFits(fitsfile, imageOptions, maskOptions, varianceOptions, metadata, imageMetadata,
+              maskMetadata, varianceMetadata);
+}
 
 template <typename ImagePixelT, typename MaskPixelT, typename VariancePixelT>
 void MaskedImage<ImagePixelT, MaskPixelT, VariancePixelT>::writeFits(

@@ -107,6 +107,18 @@ static void declareMask(py::module &mod, std::string const &suffix) {
                                  Mask<MaskPixelT>::writeFits,
             "fitsfile"_a, "metadata"_a = std::shared_ptr<lsst::daf::base::PropertySet const>());
     cls.def("writeFits",
+            (void (Mask<MaskPixelT>::*)(std::string const&, fits::ImageWriteOptions const&,
+                                        std::string const&,
+                                        std::shared_ptr<daf::base::PropertySet const>) const)
+                &Mask<MaskPixelT>::writeFits,
+            "filename"_a, "options"_a, "mode"_a="w", "header"_a=std::shared_ptr<daf::base::PropertyList>());
+    cls.def("writeFits",
+            (void (Mask<MaskPixelT>::*)(fits::MemFileManager &, fits::ImageWriteOptions const&,
+                                        std::string const&,
+                                        std::shared_ptr<daf::base::PropertySet const>) const)
+                &Mask<MaskPixelT>::writeFits,
+            "manager"_a, "options"_a, "mode"_a="w", "header"_a=std::shared_ptr<daf::base::PropertyList>());
+    cls.def("writeFits",
             (void (Mask<MaskPixelT>::*)(fits::Fits &, fits::ImageWriteOptions const&,
                                      std::shared_ptr<daf::base::PropertySet const>) const)
                 &Mask<MaskPixelT>::writeFits,

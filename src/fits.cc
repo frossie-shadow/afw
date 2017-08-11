@@ -945,12 +945,10 @@ void Fits::writeImage(
     std::shared_ptr<image::Mask<image::MaskPixel> const> mask
 ) {
     auto fits = reinterpret_cast<fitsfile *>(fptr);
-#if 1
     ImageCompressionContext comp(*this, 2, options.compression);  // RAII
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Activating compression for write image");
     }
-#endif
 
     ImageScale scale = options.scaling.determine(image, mask);
 
@@ -1007,15 +1005,13 @@ void Fits::writeImage(
         }
     }
 
-#if 1
-    // cfitsio says this is deprecated, but Pan-STARRS found that it was sometimes necessary:
+    // cfitsio says this is deprecated, but Pan-STARRS found that it was sometimes necessary, writing:
     // "This forces a re-scan of the header to ensure everything's kosher.
     // Without this, compressed HDUs have been written out with PCOUNT=0 and TFORM1 not correctly set."
     fits_set_hdustruc(fits, &status);
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Finalizing header");
     }
-#endif
 }
 
 
