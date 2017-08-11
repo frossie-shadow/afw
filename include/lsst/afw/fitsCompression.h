@@ -199,7 +199,7 @@ struct ImageCompressionOptions {
     ///
     /// @param[in] scheme_  Compression algorithm to use
     /// @param[in] rows  Compress by rows (true) or entire image (false)?
-    /// @param[in] quantizeLevel  cfitsio quantization level
+    /// @param[in] quantizeLevel_  cfitsio quantization level
     explicit ImageCompressionOptions(
         CompressionScheme scheme_,
         bool rows=true,
@@ -358,14 +358,14 @@ class ImageScalingOptions {
     /// General purpose Ctor
     ///
     /// @param[in] scheme_  Scaling algorithm to use
-    /// @param[in] bitpix  Bits per pixel (8,16,32,64,-32,-64)
-    /// @param[in] fuzz  Fuzz the values when quantising floating-point values?
-    /// @param[in] seed  Seed for random number generator when fuzzing
-    /// @param[in] maskPlanes  Mask planes to ignore when doing statistics
-    /// @param[in] quantizeLevel  Divisor of the standard deviation for STDEV_* scaling
-    /// @param[in] quantizePad  Number of stdev to allow on the low side (for STDEV_POSITIVE/NEGATIVE)
-    /// @param[in] bscale  Manually specified BSCALE (for MANUAL scaling)
-    /// @param[in] bzero  Manually specified BZERO (for MANUAL scaling)
+    /// @param[in] bitpix_  Bits per pixel (8,16,32,64,-32,-64)
+    /// @param[in] maskPlanes_  Mask planes to ignore when doing statistics
+    /// @param[in] seed_  Seed for random number generator when fuzzing
+    /// @param[in] quantizeLevel_  Divisor of the standard deviation for STDEV_* scaling
+    /// @param[in] quantizePad_  Number of stdev to allow on the low side (for STDEV_POSITIVE/NEGATIVE)
+    /// @param[in] fuzz_  Fuzz the values when quantising floating-point values?
+    /// @param[in] bscale_  Manually specified BSCALE (for MANUAL scaling)
+    /// @param[in] bzero_  Manually specified BZERO (for MANUAL scaling)
     ImageScalingOptions(
         ScalingScheme scheme_,
         int bitpix_,

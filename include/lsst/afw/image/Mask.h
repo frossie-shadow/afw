@@ -351,7 +351,7 @@ public:
     /**
      *  Write a mask to a regular FITS file.
      *
-     *  @param[in] fileName      Name of the file to write.
+     *  @param[in] filename      Name of the file to write.
      *  @param[in] options       Options controlling writing of FITS image.
      *  @param[in] mode          "w"=Create a new file; "a"=Append a new HDU.
      *  @param[in] header        Additional values to write to the header (may be null).
