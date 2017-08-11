@@ -128,9 +128,10 @@ std::pair<T, T> calculateMedianStdev(
     auto const& flatImage = ndarray::flatten<1>(image);
     auto mm = ndarray::flatten<1>(mask).begin();
     auto aa = array.begin();
-    for (auto ii = flatImage.begin(); ii != flatImage.end(); ++ii, ++mm, ++aa) {
+    for (auto ii = flatImage.begin(); ii != flatImage.end(); ++ii, ++mm) {
         if (*mm) continue;
         *aa = *ii;
+        ++aa;
     }
 
     // Quartiles; from https://stackoverflow.com/a/11965377/834250
