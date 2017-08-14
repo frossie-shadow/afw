@@ -76,12 +76,13 @@ int compressionSchemeToCfitsio(ImageCompressionOptions::CompressionScheme scheme
 
 ImageCompressionOptions::ImageCompressionOptions(
     ImageCompressionOptions::CompressionScheme scheme_,
-    bool rows,
+    int rows,
     int quantizeLevel_
 ) : scheme(scheme_), quantizeLevel(quantizeLevel_) {
     tiles = ndarray::allocate(MAX_COMPRESS_DIM);
     tiles[0] = 0;
-    for (int ii = 1; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = rows ? 1 : 0;
+    tiles[1] = rows;
+    for (int ii = 2; ii < MAX_COMPRESS_DIM; ++ii) tiles[ii] = 1;
 }
 
 

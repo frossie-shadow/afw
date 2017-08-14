@@ -204,23 +204,41 @@ struct ImageWriteOptions {
 
     /// Construct with default options for images
     template <typename T>
-    ImageWriteOptions(image::Image<T> const& image) : compression(image) {}
+    explicit ImageWriteOptions(image::Image<T> const& image) : compression(image) {}
 
     /// Construct with default options for masks
     template <typename T>
-    ImageWriteOptions(image::Mask<T> const& mask) : compression(mask) {}
+    explicit ImageWriteOptions(image::Mask<T> const& mask) : compression(mask) {}
 
     /// Construct with specific compression and scaling options
-    ImageWriteOptions(
-        ImageCompressionOptions const& compression_,
+    explicit ImageWriteOptions(
+        ImageCompressionOptions const& compression_=ImageCompressionOptions(ImageCompressionOptions::NONE),
         ImageScalingOptions const& scaling_=ImageScalingOptions())
       : compression(compression_), scaling(scaling_) {}
 
     /// Construct with specific scaling options
-    ImageWriteOptions(ImageScalingOptions const& scaling_)
+    explicit ImageWriteOptions(ImageScalingOptions const& scaling_)
       : compression(ImageCompressionOptions::NONE), scaling(scaling_) {}
-};
 
+    /// Construct from a PropertySet
+    ///
+    /// The PropertySet should include the following elements:
+    /// * compression.scheme (string): compression algorithm to use
+    /// * compression.rows (int): number of rows per tile (0 = entire image)
+    /// * compression.quantizeLevel (float): cfitsio quantization level
+    /// * scaling.scheme (string): scaling algorithm to use
+    /// * scaling.bitpix (int): bits per pixel (0, 8,16,32,64,-32,-64)
+    /// * scaling.fuzz (bool): fuzz the values when quantising floating-point values?
+    /// * scaling.seed (long): seed for random number generator when fuzzing
+    /// * scaling.maskPlanes (list of string): mask planes to ignore when doing statistics
+    /// * scaling.quantizeLevel: divisor of the standard deviation for STDEV_* scaling
+    /// * scaling.quantizePad: number of stdev to allow on the low side (for STDEV_POSITIVE/NEGATIVE)
+    /// * scaling.bscale: manually specified BSCALE (for MANUAL scaling)
+    /// * scaling.bzero: manually specified BSCALE (for MANUAL scaling)
+    ///
+    /// @param[in] config  Configuration of image write options
+    ImageWriteOptions(daf::base::PropertySet const& config);
+};
 
 /**
  *  @brief A simple struct that combines the two arguments that must be passed to most cfitsio routines

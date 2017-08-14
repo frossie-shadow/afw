@@ -1256,6 +1256,26 @@ bool Fits::checkCompressedImagePhu() {
 }
 
 
+ImageWriteOptions::ImageWriteOptions(daf::base::PropertySet const& config)
+  : compression(
+        fits::compressionSchemeFromString(config.get<std::string>("compression.scheme")),
+        config.getAsInt("compression.rows"),
+        config.getAsDouble("compression.quantizeLevel")
+    ),
+    scaling(
+        fits::scalingSchemeFromString(config.get<std::string>("scaling.scheme")),
+        config.getAsInt("scaling.bitpix"),
+        config.getArray<std::string>("scaling.maskPlanes"),
+        config.get<bool>("scaling.fuzz"),
+        config.getAsInt64("scaling.seed"),
+        config.getAsDouble("scaling.quantizeLevel"),
+        config.getAsDouble("scaling.quantizePad"),
+        config.getAsDouble("scaling.bscale"),
+        config.getAsDouble("scaling.bzero")
+    )
+{}
+
+
 #define INSTANTIATE_KEY_OPS(r, data, T)                                                            \
     template void Fits::updateKey(std::string const &, T const &, std::string const &);            \
     template void Fits::writeKey(std::string const &, T const &, std::string const &);             \

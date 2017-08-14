@@ -198,21 +198,21 @@ struct ImageCompressionOptions {
     /// Compression by rows or entire image
     ///
     /// @param[in] scheme_  Compression algorithm to use
-    /// @param[in] rows  Compress by rows (true) or entire image (false)?
+    /// @param[in] rows  Number of rows per tile (0 = entire image)
     /// @param[in] quantizeLevel_  cfitsio quantization level
     explicit ImageCompressionOptions(
         CompressionScheme scheme_,
-        bool rows=true,
+        int rows=1,
         int quantizeLevel_=0.0
     );
 
     /// Default compression for a particular style of image
     template <typename T>
     explicit ImageCompressionOptions(image::Image<T> const& image) :
-        ImageCompressionOptions(image.getBBox().getArea() > 0 ? GZIP : NONE) {}
+        ImageCompressionOptions(image.getBBox().getArea() > 0 ? GZIP_SHUFFLE : NONE) {}
     template <typename T>
     explicit ImageCompressionOptions(image::Mask<T> const& mask) :
-        ImageCompressionOptions(mask.getBBox().getArea() > 0 ? GZIP : NONE) {}
+        ImageCompressionOptions(mask.getBBox().getArea() > 0 ? GZIP_SHUFFLE : NONE) {}
 
     // Disable compression for int64: cfitsio won't compress them
     explicit ImageCompressionOptions(image::Image<std::int64_t> const& image) :
@@ -340,7 +340,7 @@ class ImageScalingOptions {
         MANUAL,  ///< Scale set manually
     };
     ScalingScheme scheme;  ///< Scaling algorithm to use
-    int bitpix;  ///< Bits per pixel (8,16,32,64,-32,-64)
+    int bitpix;  ///< Bits per pixel (0, 8,16,32,64,-32,-64)
     bool fuzz;  ///< Fuzz the values when quantising floating-point values?
     unsigned long seed;  ///< Seed for random number generator when fuzzing
     std::vector<std::string> maskPlanes;  ///< Mask planes to ignore when doing statistics
