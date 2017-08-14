@@ -509,14 +509,14 @@ void Mask<MaskPixelT>::writeFits(fits::Fits& fitsfile,
 
 template <typename MaskPixelT>
 void Mask<MaskPixelT>::writeFits(
-    std::string const& filename,    
+    std::string const& filename,
     fits::ImageWriteOptions const& options,
     std::string const& mode,
     std::shared_ptr<daf::base::PropertySet const> header
 ) const {
     fits::Fits fitsfile(filename, mode, fits::Fits::AUTO_CLOSE | fits::Fits::AUTO_CHECK);
     writeFits(fitsfile, options, header);
-}    
+}
 
 template <typename MaskPixelT>
 void Mask<MaskPixelT>::writeFits(
@@ -527,7 +527,7 @@ void Mask<MaskPixelT>::writeFits(
 ) const {
     fits::Fits fitsfile(manager, mode, fits::Fits::AUTO_CLOSE | fits::Fits::AUTO_CHECK);
     writeFits(fitsfile, options, header);
-}    
+}
 
 template <typename MaskPixelT>
 void Mask<MaskPixelT>::writeFits(
@@ -535,7 +535,10 @@ void Mask<MaskPixelT>::writeFits(
     fits::ImageWriteOptions const& options,
     std::shared_ptr<daf::base::PropertySet const> header
 ) const {
-    fitsfile.writeImage(*this, options, header);
+    std::shared_ptr<daf::base::PropertySet> useHeader = header ? header->deepCopy() :
+        std::make_shared<dafBase::PropertySet>();
+    addMaskPlanesToMetadata(useHeader);
+    fitsfile.writeImage(*this, options, useHeader);
 }
 
 #endif  // !DOXYGEN

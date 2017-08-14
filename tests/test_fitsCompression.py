@@ -88,6 +88,8 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         """
         image = ImageClass(self.bbox)
         mask = lsst.afw.image.Mask(self.bbox)
+        mask.clearMaskPlaneDict()
+        mask.addMaskPlane(self.badMask)
         bad = mask.getPlaneBitMask(self.badMask)
         image.set(self.base)
         image.set(self.highPixel[0], self.highPixel[1], self.highValue)
