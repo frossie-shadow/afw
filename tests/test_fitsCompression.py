@@ -344,6 +344,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(78, 90))
         self.background = 12345.6789  # Background value
         self.noise = 67.89  # Noise (stdev)
+        self.maskPlanes = ["FOO", "BAR"]  # Mask planes to add
 
     def makeImage(self, ImageClass):
         """Create an image
@@ -380,6 +381,9 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         rng = np.random.RandomState(12345)
         dtype = mask.getArray().dtype
         mask.getArray()[:] = rng.randint(0, 2**(dtype.itemsize*8 - 1), mask.getArray().shape, dtype=dtype)
+        mask.clearMaskPlaneDict()
+        for plane in self.maskPlanes:
+            mask.addMaskPlane(plane)
         return mask
 
     def checkCompressedImage(self, ImageClass, image, compression, scaling=None, atol=0.0):
@@ -397,6 +401,11 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             Scaling parameters for lossy compression (optional).
         atol : `float`
             Absolute tolerance for comparing unpersisted image.
+
+        Returns
+        -------
+        unpersisted : `ImageClass`
+            The unpersisted image.
         """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
             if scaling:
@@ -404,14 +413,19 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             else:
                 options = lsst.afw.fits.ImageWriteOptions(compression)
             image.writeFits(filename, options)
+
             fileSize = os.stat(filename).st_size
             numBlocks = 1 + np.ceil(self.bbox.getArea()*image.getArray().dtype.itemsize/2880.0)
             uncompressedSize = 2880*numBlocks
             print(ImageClass, compression.scheme, fileSize, uncompressedSize, fileSize/uncompressedSize)
 
+            if hasattr(image, "clearMaskPlaneDict"):
+                image.clearMaskPlaneDict()
+
             unpersisted = ImageClass(filename)
             self.assertEqual(image.getBBox(), unpersisted.getBBox())
             self.assertImagesAlmostEqual(unpersisted, image, atol=atol)
+            return unpersisted
 
     def testLosslessFloat(self):
         """Test lossless compression of floating-point image"""
@@ -464,7 +478,11 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             else:
                 compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme))
 
-            self.checkCompressedImage(lsst.afw.image.Mask, self.makeMask(), compression, atol=0.0)
+            mask = self.makeMask()
+            unpersisted = self.checkCompressedImage(lsst.afw.image.Mask, mask, compression, atol=0.0)
+            for mp in mask.getMaskPlaneDict():
+                self.assertIn(mp, unpersisted.getMaskPlaneDict())
+                unpersisted.getPlaneBitMask(mp)
 
     def testLossyFloatCfitsio(self):
         """Test lossy compresion of floating-point images with cfitsio
@@ -518,6 +536,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
             image.writeFits(filename, imageOptions, maskOptions, varianceOptions)
+            image.getMask().clearMaskPlaneDict()
             unpersisted = type(image)(filename)
             if hasattr(image, "getMaskedImage"):
                 image = image.getMaskedImage()
@@ -526,6 +545,11 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.assertImagesAlmostEqual(unpersisted.getImage(), image.getImage(), atol=atol)
             self.assertImagesAlmostEqual(unpersisted.getMask(), image.getMask(), atol=atol)
             self.assertImagesAlmostEqual(unpersisted.getVariance(), image.getVariance(), atol=atol)
+
+            for mp in image.getMask().getMaskPlaneDict():
+                self.assertIn(mp, unpersisted.getMask().getMaskPlaneDict())
+                unpersisted.getMask().getPlaneBitMask(mp)
+                print(mp)
 
     def checkMaskedImage(self, imageOptions, maskOptions, varianceOptions, atol=0.0):
         """Check that we can compress a MaskedImage and Exposure
