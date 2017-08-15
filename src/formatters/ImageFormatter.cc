@@ -149,10 +149,12 @@ void ImageFormatter<ImagePixelT>::write(Persistable const* persistable,
         if (additionalData) {
             try {
                 options = fits::ImageWriteOptions(*additionalData->getAsPropertySetPtr("image"));
-            } catch (...) {
-                LOGL_WARN(_log, "Unable to construct image write options; writing with default options");
+            } catch (std::exception const& exc) {
+                LOGLS_WARN(_log, "Unable to construct image write options (" << exc.what() <<
+                           "); writing with default options");
             }
         }
+
         ip->writeFits(fits->getPath(), options);
         // @todo Do something with these fields?
         // int _X0;

@@ -30,6 +30,7 @@ import numpy as np
 
 import lsst.utils
 import lsst.daf.base
+import lsst.daf.persistence
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.fits
@@ -348,6 +349,12 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         self.noise = 67.89  # Noise (stdev)
         self.maskPlanes = ["FOO", "BAR"]  # Mask planes to add
 
+    def readWriteImage(self, ImageClass, image, filename, options, *args):
+        image.writeFits(filename, options, *args)
+        if hasattr(image, "clearMaskPlaneDict"):
+            image.clearMaskPlaneDict()
+        return ImageClass(filename)
+
     def makeImage(self, ImageClass):
         """Create an image
 
@@ -388,6 +395,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             mask.addMaskPlane(plane)
         return mask
 
+#    @lsst.utils.tests.debugger(Exception)
     def checkCompressedImage(self, ImageClass, image, compression, scaling=None, atol=0.0):
         """Check that compression works on an image
 
@@ -414,17 +422,13 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
                 options = lsst.afw.fits.ImageWriteOptions(compression, scaling)
             else:
                 options = lsst.afw.fits.ImageWriteOptions(compression)
-            image.writeFits(filename, options)
+            unpersisted = self.readWriteImage(ImageClass, image, filename, options)
 
             fileSize = os.stat(filename).st_size
             numBlocks = 1 + np.ceil(self.bbox.getArea()*image.getArray().dtype.itemsize/2880.0)
             uncompressedSize = 2880*numBlocks
             print(ImageClass, compression.scheme, fileSize, uncompressedSize, fileSize/uncompressedSize)
 
-            if hasattr(image, "clearMaskPlaneDict"):
-                image.clearMaskPlaneDict()
-
-            unpersisted = ImageClass(filename)
             self.assertEqual(image.getBBox(), unpersisted.getBBox())
             self.assertImagesAlmostEqual(unpersisted, image, atol=atol)
             return unpersisted
@@ -523,6 +527,13 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             image = self.makeImage(cls)
             self.checkCompressedImage(cls, image, compression, scaling, atol=1.2*self.noise/quantize)
 
+    def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
+        image.writeFits(filename, imageOptions, maskOptions, varianceOptions)
+        if hasattr(image, "getMaskedImage"):
+            image = image.getMaskedImage()
+        image.getMask().clearMaskPlaneDict()
+        return lsst.afw.image.MaskedImageF(filename)
+
     def checkCompressedMaskedImage(self, image, imageOptions, maskOptions, varianceOptions, atol=0.0):
         """Check that compression works on a MaskedImage
 
@@ -537,8 +548,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             Absolute tolerance for comparing unpersisted image.
         """
         with lsst.utils.tests.getTempFilePath(".fits") as filename:
-            image.writeFits(filename, imageOptions, maskOptions, varianceOptions)
-            image.getMask().clearMaskPlaneDict()
+            self.readWriteMaskedImage(image, filename, imageOptions, maskOptions, varianceOptions)
             unpersisted = type(image)(filename)
             if hasattr(image, "getMaskedImage"):
                 image = image.getMaskedImage()
@@ -551,7 +561,6 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             for mp in image.getMask().getMaskPlaneDict():
                 self.assertIn(mp, unpersisted.getMask().getMaskPlaneDict())
                 unpersisted.getMask().getPlaneBitMask(mp)
-                print(mp)
 
     def checkMaskedImage(self, imageOptions, maskOptions, varianceOptions, atol=0.0):
         """Check that we can compress a MaskedImage and Exposure
@@ -595,6 +604,62 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         imageOptions = lsst.afw.fits.ImageWriteOptions(compression, scaling)
         maskOptions = lsst.afw.fits.ImageWriteOptions(compression)
         self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.2*self.noise/quantize)
+
+
+def optionsToPropertySet(options):
+    ps = lsst.daf.base.PropertySet()
+    ps.set("compression.scheme", lsst.afw.fits.compressionSchemeToString(options.compression.scheme))
+    ps.set("compression.rows", 0)
+    ps.set("compression.quantizeLevel", options.compression.quantizeLevel)
+
+    ps.set("scaling.scheme", lsst.afw.fits.scalingSchemeToString(options.scaling.scheme))
+    ps.set("scaling.bitpix", options.scaling.bitpix)
+    ps.setString("scaling.maskPlanes", options.scaling.maskPlanes)
+    ps.set("scaling.fuzz", options.scaling.fuzz)
+    ps.setLongLong("scaling.seed", options.scaling.seed)
+    ps.set("scaling.quantizeLevel", options.scaling.quantizeLevel)
+    ps.set("scaling.quantizePad", options.scaling.quantizePad)
+    ps.set("scaling.bscale", options.scaling.bscale)
+    ps.set("scaling.bzero", options.scaling.bzero)
+    return ps
+
+
+def persistUnpersist(ImageClass, image, filename, additionalData):
+    additionalData.set("visit", 12345)
+    additionalData.set("ccd", 67)
+
+    persistence = lsst.daf.persistence.Persistence.getPersistence(lsst.pex.policy.Policy())
+    logicalLocation = lsst.daf.persistence.LogicalLocation(filename)
+    storage = persistence.getRetrieveStorage("FitsStorage", logicalLocation)
+    storageList = lsst.daf.persistence.StorageList([storage])
+
+    persistence.persist(image, storageList, additionalData)
+
+    classMenu = {
+        lsst.afw.image.ImageU: "ImageU",
+        lsst.afw.image.ImageI: "ImageI",
+        lsst.afw.image.ImageL: "ImageL",
+        lsst.afw.image.ImageF: "ImageF",
+        lsst.afw.image.ImageD: "ImageD",
+        lsst.afw.image.Mask: "Mask",
+        lsst.afw.image.MaskedImageF: "MaskedImageF",
+        }
+    return persistence.unsafeRetrieve(classMenu[ImageClass], storageList, lsst.daf.base.PropertySet())
+
+
+class PersistenceTestCase(ImageCompressionTestCase):
+    def readWriteImage(self, ImageClass, image, filename, options):
+        additionalData = lsst.daf.base.PropertySet()
+        additionalData.set("image", optionsToPropertySet(options))
+        additionalData.set("mask", optionsToPropertySet(options))
+        return persistUnpersist(ImageClass, image, filename, additionalData)
+
+    def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
+        additionalData = lsst.daf.base.PropertySet()
+        additionalData.set("image", optionsToPropertySet(imageOptions))
+        additionalData.set("mask", optionsToPropertySet(maskOptions))
+        additionalData.set("variance", optionsToPropertySet(varianceOptions))
+        return persistUnpersist(lsst.afw.image.MaskedImageF, image, filename, additionalData)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

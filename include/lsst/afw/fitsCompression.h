@@ -385,7 +385,8 @@ class ImageScalingOptions {
     /// @param[in] bscale_  Manually specified BSCALE
     /// @param[in] bzero_  Manually specified BZERO
     ImageScalingOptions(int bitpix_, double bscale_=1.0, double bzero_=0.0)
-      : scheme(MANUAL), bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
+      : scheme(MANUAL), bitpix(bitpix_), fuzz(false), seed(1), maskPlanes({}),
+        quantizeLevel(4.0), quantizePad(5.0), bscale(bscale_), bzero(bzero_) {}
 
     ///{
     /// Determine the scaling for a particular image

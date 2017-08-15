@@ -1265,11 +1265,12 @@ ImageWriteOptions::ImageWriteOptions(daf::base::PropertySet const& config)
     scaling(
         fits::scalingSchemeFromString(config.get<std::string>("scaling.scheme")),
         config.getAsInt("scaling.bitpix"),
-        config.getArray<std::string>("scaling.maskPlanes"),
-        config.get<bool>("scaling.fuzz"),
+        config.exists("scaling.maskPlanes") ? config.getArray<std::string>("scaling.maskPlanes") :
+            std::vector<std::string>(),
         config.getAsInt64("scaling.seed"),
         config.getAsDouble("scaling.quantizeLevel"),
         config.getAsDouble("scaling.quantizePad"),
+        config.get<bool>("scaling.fuzz"),
         config.getAsDouble("scaling.bscale"),
         config.getAsDouble("scaling.bzero")
     )

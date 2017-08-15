@@ -152,6 +152,9 @@ void defineImageWriteOptions(py::module & mod) {
     cls.def(py::init<ImageCompressionOptions const&, ImageScalingOptions const&>(),
             "compression"_a, "scaling"_a=ImageScalingOptions());
     cls.def(py::init<ImageScalingOptions const&>());
+
+    cls.def_readonly("compression", &ImageWriteOptions::compression);
+    cls.def_readonly("scaling", &ImageWriteOptions::scaling);
 }
 
 // Wrapping for lsst::afw::fits::Fits

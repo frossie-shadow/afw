@@ -140,8 +140,9 @@ void MaskedImageFormatter<ImagePixelT, MaskPixelT, VariancePixelT>::write(
                 imageOptions = fits::ImageWriteOptions(*additionalData->getAsPropertySetPtr("image"));
                 maskOptions = fits::ImageWriteOptions(*additionalData->getAsPropertySetPtr("mask"));
                 varianceOptions = fits::ImageWriteOptions(*additionalData->getAsPropertySetPtr("variance"));
-            } catch (...) {
-                LOGL_WARN(_log, "Unable to construct image write options; writing with default options");
+            } catch (std::exception const& exc) {
+                LOGLS_WARN(_log, "Unable to construct MaskedImage write options (" << exc.what() <<
+                           "); writing with default options");
             }
         }
         ip->writeFits(fits->getPath(), imageOptions, maskOptions, varianceOptions);

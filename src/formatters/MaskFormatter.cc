@@ -111,8 +111,9 @@ void MaskFormatter<MaskPixelT>::write(Persistable const* persistable, std::share
         if (additionalData) {
             try {
                 options = fits::ImageWriteOptions(*additionalData->getAsPropertySetPtr("mask"));
-            } catch (...) {
-                LOGL_WARN(_log, "Unable to construct image write options; writing with default options");
+            } catch (std::exception const& exc) {
+                LOGLS_WARN(_log, "Unable to construct mask write options (" << exc.what() <<
+                           "); writing with default options");
             }
         }
 
