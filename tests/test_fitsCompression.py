@@ -626,8 +626,8 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.25*self.noise/quantize)
 
         # Lossy our compression
-        quantize = 4.0
-        compression = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, True, 0.0)
+        quantize = 10.0
+        compression = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.RICE, True, 0.0)
         scaling = lsst.afw.fits.ImageScalingOptions(ImageScalingOptions.STDEV_BOTH, 32,
                                                     quantizeLevel=quantize)
         imageOptions = lsst.afw.fits.ImageWriteOptions(compression, scaling)
