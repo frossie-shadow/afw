@@ -350,6 +350,22 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         self.maskPlanes = ["FOO", "BAR"]  # Mask planes to add
 
     def readWriteImage(self, ImageClass, image, filename, options, *args):
+        """Read the image after it has been written
+
+        This implementation does the persistence using methods on the
+        ImageClass.
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        image : `lsst.afw.image.Image`
+            Image to compress.
+        filename : `str`
+            Filename to which to write.
+        options : `lsst.afw.fits.ImageWriteOptions`
+            Options for writing.
+        """
         image.writeFits(filename, options, *args)
         if hasattr(image, "clearMaskPlaneDict"):
             image.clearMaskPlaneDict()
@@ -395,7 +411,6 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             mask.addMaskPlane(plane)
         return mask
 
-#    @lsst.utils.tests.debugger(Exception)
     def checkCompressedImage(self, ImageClass, image, compression, scaling=None, atol=0.0):
         """Check that compression works on an image
 
@@ -528,6 +543,20 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             self.checkCompressedImage(cls, image, compression, scaling, atol=1.2*self.noise/quantize)
 
     def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
+        """Read the MaskedImage after it has been written
+
+        This implementation does the persistence using methods on the
+        MaskedImage class.
+
+        Parameters
+        ----------
+        image : `lsst.afw.image.Image`
+            Image to compress.
+        filename : `str`
+            Filename to which to write.
+        imageOptions, maskOptions, varianceOptions : `lsst.afw.fits.ImageWriteOptions`
+            Options for writing the image, mask and variance planes.
+        """
         image.writeFits(filename, imageOptions, maskOptions, varianceOptions)
         if hasattr(image, "getMaskedImage"):
             image = image.getMaskedImage()
@@ -607,6 +636,11 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
 
 
 def optionsToPropertySet(options):
+    """Convert the ImageWriteOptions to a PropertySet
+
+    This allows us to pass the options into the persistence framework
+    as the "additionalData".
+    """
     ps = lsst.daf.base.PropertySet()
     ps.set("compression.scheme", lsst.afw.fits.compressionSchemeToString(options.compression.scheme))
     ps.set("compression.rows", 0)
@@ -625,6 +659,24 @@ def optionsToPropertySet(options):
 
 
 def persistUnpersist(ImageClass, image, filename, additionalData):
+    """Use the persistence framework to persist and unpersist an image
+
+    Parameters
+    ----------
+    ImageClass : `type`, an `lsst.afw.image.Image` class
+        Class of image.
+    image : `lsst.afw.image.Image` or `lsst.afw.image.MaskedImage`
+        Image to compress.
+    filename : `str`
+        Filename to write.
+    additionalData : `lsst.daf.base.PropertySet`
+        Additionl data for persistence framework.
+
+    Returns
+    -------
+    unpersisted : `ImageClass`
+        The unpersisted image.
+    """
     additionalData.set("visit", 12345)
     additionalData.set("ccd", 67)
 
@@ -648,13 +700,45 @@ def persistUnpersist(ImageClass, image, filename, additionalData):
 
 
 class PersistenceTestCase(ImageCompressionTestCase):
+    """Test compression using the persistence framework
+
+    We override the I/O methods to use the persistence framework.
+    """
     def readWriteImage(self, ImageClass, image, filename, options):
+        """Read the image after it has been written
+
+        This implementation uses the persistence framework.
+
+        Parameters
+        ----------
+        ImageClass : `type`, an `lsst.afw.image.Image` class
+            Class of image to create.
+        image : `lsst.afw.image.Image`
+            Image to compress.
+        filename : `str`
+            Filename to which to write.
+        options : `lsst.afw.fits.ImageWriteOptions`
+            Options for writing.
+        """
         additionalData = lsst.daf.base.PropertySet()
         additionalData.set("image", optionsToPropertySet(options))
         additionalData.set("mask", optionsToPropertySet(options))
         return persistUnpersist(ImageClass, image, filename, additionalData)
 
     def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
+        """Read the MaskedImage after it has been written
+
+        This implementation uses the persistence framework.
+
+        Parameters
+        ----------
+        image : `lsst.afw.image.Image`
+            Image to compress.
+        filename : `str`
+            Filename to which to write.
+        imageOptions, maskOptions, varianceOptions : `lsst.afw.fits.ImageWriteOptions`
+            Options for writing the image, mask and variance planes.
+        """
         additionalData = lsst.daf.base.PropertySet()
         additionalData.set("image", optionsToPropertySet(imageOptions))
         additionalData.set("mask", optionsToPropertySet(maskOptions))
