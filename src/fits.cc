@@ -945,7 +945,9 @@ void Fits::writeImage(
     std::shared_ptr<image::Mask<image::MaskPixel> const> mask
 ) {
     auto fits = reinterpret_cast<fitsfile *>(fptr);
-    ImageCompressionContext comp(*this, 2, options.compression);  // RAII
+    ImageCompressionOptions const& compression = image.getBBox().getArea() > 0 ? options.compression :
+        ImageCompressionOptions(ImageCompressionOptions::NONE);  // cfitsio can't compress empty images
+    ImageCompressionContext comp(*this, 2, compression);  // RAII
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Activating compression for write image");
     }

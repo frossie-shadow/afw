@@ -162,7 +162,7 @@ void Exposure<ImageT, MaskT, VarianceT>::writeFits(
 ) const {
     fits::Fits fitsfile(fileName, "w", fits::Fits::AUTO_CLOSE | fits::Fits::AUTO_CHECK);
     writeFits(fitsfile, imageOptions, maskOptions, varianceOptions);
-}    
+}
 
 template <typename ImageT, typename MaskT, typename VarianceT>
 void Exposure<ImageT, MaskT, VarianceT>::writeFits(

@@ -746,6 +746,41 @@ class PersistenceTestCase(ImageCompressionTestCase):
         return persistUnpersist(lsst.afw.image.MaskedImageF, image, filename, additionalData)
 
 
+class EmptyExposureTestCase(lsst.utils.tests.TestCase):
+    """Test that an empty image can be written
+
+    We sometimes use an empty lsst.afw.image.Exposure as a vehicle for
+    persisting other things, e.g., Wcs. cfitsio compression will choke
+    on an empty image, so make sure we're dealing with that.
+    """
+    def checkEmptyExposure(self, scheme):
+        """Check that we can persist an empty Exposure
+
+        Parameters
+        ----------
+        scheme : `lsst.afw.fits.ImageCompressionOptions.CompressionScheme`
+            Compression algorithm to try.
+        """
+        exp = lsst.afw.image.ExposureF(0, 0)
+        degrees = lsst.afw.geom.degrees
+        exp.setWcs(lsst.afw.image.makeWcs(lsst.afw.coord.Coord(0*degrees, 0*degrees),
+                                          lsst.afw.geom.Point2D(0.0, 0.0),
+                                          1.0e-4, 0.0, 0.0, 1.0e-4))
+        imageOptions = lsst.afw.fits.ImageWriteOptions(ImageCompressionOptions(scheme))
+        maskOptions = lsst.afw.fits.ImageWriteOptions(exp.getMaskedImage().getMask())
+        varianceOptions = lsst.afw.fits.ImageWriteOptions(ImageCompressionOptions(scheme))
+        with lsst.utils.tests.getTempFilePath(".fits") as filename:
+            exp.writeFits(filename, imageOptions, maskOptions, varianceOptions)
+            unpersisted = type(exp)(filename)
+        self.assertEqual(unpersisted.getMaskedImage().getDimensions(), lsst.afw.geom.Extent2I(0, 0))
+        self.assertEqual(unpersisted.getWcs(), exp.getWcs())
+
+    def testEmptyExposure(self):
+        schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
+        for scheme in schemeList:
+            self.checkEmptyExposure(lsst.afw.fits.compressionSchemeFromString(scheme))
+
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
 
