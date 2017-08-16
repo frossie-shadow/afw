@@ -999,10 +999,14 @@ void Fits::writeImage(
     if (!std::is_same<T, std::int64_t>::value && !std::is_same<T, std::uint64_t>::value &&
         std::isfinite(scale.bzero) && std::isfinite(scale.bscale) && (scale.bscale != 0.0)) {
         if (std::numeric_limits<T>::is_integer) {
-            fits_write_key_lng(fits, "BZERO", static_cast<long>(scale.bzero),
-                               "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
-            fits_write_key_lng(fits, "BSCALE", static_cast<long>(scale.bscale),
-                               "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
+            if (scale.bzero != 0.0) {
+                fits_write_key_lng(fits, "BZERO", static_cast<long>(scale.bzero),
+                                   "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
+            }
+            if (scale.bscale != 1.0) {
+                fits_write_key_lng(fits, "BSCALE", static_cast<long>(scale.bscale),
+                                   "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
+            }
         } else {
             fits_write_key_dbl(fits, "BZERO", scale.bzero, 12,
                                "Scaling: MEMORY = BZERO + BSCALE * DISK", &status);
