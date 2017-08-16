@@ -1089,12 +1089,10 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
         LSST_FITS_CHECK_STATUS(*this, "Setting compression type");
     }
 
-#if 1
     if (scheme == ImageCompressionOptions::NONE) {
         // Nothing else worth doing
         return;
     }
-#endif
 
     fits_set_tile_dim(fits, comp.tiles.getNumElements(), comp.tiles.getData(), &status);
     if (behavior & AUTO_CHECK) {
