@@ -936,6 +936,27 @@ void Fits::writeImageImpl(T const *data, int nElements) {
     }
 }
 
+namespace {
+
+/// RAII for activating compression
+///
+/// Compression is a property of the file in cfitsio, so we need to set it,
+/// do our stuff and then disable it.
+struct ImageCompressionContext {
+  public:
+    ImageCompressionContext(Fits & fits_, ImageCompressionOptions const& useThis)
+        : fits(fits_) {
+        fits.setImageCompression(useThis);
+    }
+    ~ImageCompressionContext() {
+        int status = 0;
+        fits_unset_compression_request(reinterpret_cast<fitsfile *>(fits.fptr), &status);
+    }
+  private:
+    Fits & fits;  // FITS file we're working on
+};
+
+} // anonymous namespace
 
 template <typename T>
 void Fits::writeImage(
@@ -947,7 +968,7 @@ void Fits::writeImage(
     auto fits = reinterpret_cast<fitsfile *>(fptr);
     ImageCompressionOptions const& compression = image.getBBox().getArea() > 0 ? options.compression :
         ImageCompressionOptions(ImageCompressionOptions::NONE);  // cfitsio can't compress empty images
-    ImageCompressionContext comp(*this, 2, compression);  // RAII
+    ImageCompressionContext comp(*this, compression);  // RAII
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Activating compression for write image");
     }

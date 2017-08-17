@@ -646,33 +646,6 @@ std::shared_ptr<daf::base::PropertyList> readMetadata(fits::MemFileManager& mana
 std::shared_ptr<daf::base::PropertyList> readMetadata(fits::Fits& fitsfile, bool strip = false);
 
 
-/// RAII for activating compression
-///
-/// Compression is a property of the file in cfitsio, so we need to set it,
-/// do our stuff and then restore the old settings.
-struct ImageCompressionContext {
-  public:
-    ImageCompressionContext(Fits & fits_, int nDim, ImageCompressionOptions const& useThis)
-        : fits(fits_), old(fits.getImageCompression(nDim)) {
-        fits.setImageCompression(useThis);
-    }
-    ~ImageCompressionContext() {
-        // We may be destructing because a Fits function threw an exception, so
-        // guard against making it worse by throwing in the destructor.
-        int status = 0;
-        std::swap(fits.status, status);
-        try {
-            fits.setImageCompression(old);
-        } catch (...) {} // swallow all errors: this is the destructor!
-        std::swap(fits.status, status);
-    }
-  private:
-    Fits & fits;  // FITS file we're working on
-    ImageCompressionOptions old;  // Former settings, to be restored on destruction
-
-};
-
-
 void setAllowImageCompression(bool allow);
 bool getAllowImageCompression();
 
