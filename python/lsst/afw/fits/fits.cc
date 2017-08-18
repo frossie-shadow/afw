@@ -123,7 +123,7 @@ void defineImageScalingOptions(py::module & mod) {
 
 template <typename T>
 void defineImageScaleTemplates(py::class_<ImageScale> & cls, std::string const& suffix) {
-    cls.def("toFits", &ImageScale::toFits<T>, "image"_a, "fuzz"_a=true, "seed"_a=1);
+    cls.def("toFits", &ImageScale::toFits<T>, "image"_a, "forceNonfiniteRemoval"_a=false, "fuzz"_a=true, "seed"_a=1);
     cls.def("fromFits", &ImageScale::fromFits<T>);
 }
 

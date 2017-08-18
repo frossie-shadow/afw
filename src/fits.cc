@@ -994,8 +994,8 @@ void Fits::writeImage(
 
     // Scale the image how we want it on disk
     ndarray::Array<T const, 2, 2> array = makeContiguousArray(image.getArray());
-    std::shared_ptr<detail::PixelArrayBase> pixels = scale.toFits(array, options.scaling.fuzz,
-                                                                  options.scaling.seed);
+    auto pixels = scale.toFits(array, compression.quantizeLevel != 0,
+                               options.scaling.fuzz, options.scaling.seed);
 
     // We only want cfitsio to do the scale and zero for unsigned 64-bit integer types. For those,
     // "double bzero" has sufficient precision to represent the appropriate value. We'll let
@@ -1036,6 +1036,17 @@ void Fits::writeImage(
         }
         if (behavior & AUTO_CHECK) {
             LSST_FITS_CHECK_STATUS(*this, "Writing BSCALE,BZERO");
+        }
+    }
+
+    if (scale.bitpix > 0) {
+        if (compression.scheme == ImageCompressionOptions::NONE) {
+            fits_write_key_lng(fits, "BLANK", scale.blank, "Value for undefined pixels", &status);
+        } else {
+            fits_write_key_lng(fits, "ZBLANK", scale.blank, "Value for undefined pixels", &status);
+        }
+        if (behavior & AUTO_CHECK) {
+            LSST_FITS_CHECK_STATUS(*this, "Writing [Z]BLANK");
         }
     }
 

@@ -256,12 +256,37 @@ ImageScale ImageScalingOptions::determine(
 template <typename T>
 std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
     ndarray::Array<T const, 2, 2> const& image,
+    bool forceNonfiniteRemoval,
     bool fuzz,
     unsigned long seed
 ) const {
-    if (bitpix < 0 || (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
-        // Type conversion only
-        return detail::makePixelArray(bitpix, ndarray::Array<T const, 1, 1>(ndarray::flatten<1>(image)));
+    if (!std::numeric_limits<T>::is_integer && bitpix < 0) {
+        if (bitpix != detail::Bitpix<T>::value) {
+            throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
+                              "Floating-point images may not be converted to different floating-point types");
+        }
+        if (bscale != 1.0 || bzero != 0.0) {
+            throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
+                              "Scaling may not be applied to floating-point images");
+        }
+    }
+
+    if (bitpix < 0 || (bitpix == 0 && !std::numeric_limits<T>::is_integer) ||
+        (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
+        if (!forceNonfiniteRemoval) {
+            // Type conversion only
+            return detail::makePixelArray(bitpix, ndarray::Array<T const, 1, 1>(ndarray::flatten<1>(image)));
+        }
+        if (!std::numeric_limits<T>::is_integer) {
+            ndarray::Array<T, 1, 1> out = ndarray::allocate(image.getNumElements());
+            auto outIter = out.begin();
+            auto const& flatImage = ndarray::flatten<1>(image);
+            for (auto inIter = flatImage.begin(); inIter != flatImage.end(); ++inIter, ++outIter) {
+                *outIter = std::isfinite(*inIter) ? *inIter : std::numeric_limits<T>::max();
+            }
+            return detail::makePixelArray(bitpix, out);
+        }
+        // Fall through for explicit scaling
     }
 
     math::Random rng(math::Random::MT19937, seed);
@@ -295,7 +320,6 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
     }
 
     return detail::makePixelArray(bitpix, out);
-
 }
 
 
@@ -312,7 +336,7 @@ ndarray::Array<T, 2, 2> ImageScale::fromFits(ndarray::Array<T, 2, 2> const& imag
     template ImageScale ImageScalingOptions::determine<TYPE, 2>( \
         ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const; \
     template std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits<TYPE>( \
-        ndarray::Array<TYPE const, 2, 2> const&, bool, unsigned long) const; \
+        ndarray::Array<TYPE const, 2, 2> const&, bool, bool, unsigned long) const; \
     template ndarray::Array<TYPE, 2, 2> ImageScale::fromFits<TYPE>( \
         ndarray::Array<TYPE, 2, 2> const&) const;
 

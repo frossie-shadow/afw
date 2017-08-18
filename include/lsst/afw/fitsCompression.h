@@ -143,7 +143,6 @@ std::shared_ptr<PixelArrayBase> makePixelArray(
     }
 }
 
-
 } // namespace detail
 
 
@@ -253,20 +252,24 @@ struct ImageScale {
     int bitpix;  ///< Bits per pixel; negative means floating-point: 8,16,32,64,-32,-64
     double bscale;  ///< Scale to apply when reading from FITS
     double bzero;  ///< Zero-point to apply when reading from FITS
+    long blank;  ///<  Value for integer images indicating non-finite values
 
     /// Constructor
     ImageScale(int bitpix_, double bscale_, double bzero_) :
-      bitpix(bitpix_), bscale(bscale_), bzero(bzero_) {}
+      bitpix(bitpix_), bscale(bscale_), bzero(bzero_),
+      blank(bitpix > 0 ? (1L << (bitpix - 1)) - 1 : 0) {}
 
     /// Convert to an array of pixel values to write to FITS
     ///
     /// @param[in] image  Image to scale
+    /// @param[in] forceNonfiniteRemoval  Force removal of non-finite values?
     /// @param[in] fuzz  Add random values before quantising?
     /// @param[in] seed  Seed for random number generator
     /// @return Array of pixel values, appropriately scaled.
     template <typename T>
     std::shared_ptr<detail::PixelArrayBase> toFits(
         ndarray::Array<T const, 2, 2> const& image,
+        bool forceNonfiniteRemoval,
         bool fuzz,
         unsigned long seed=1
     ) const;
