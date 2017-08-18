@@ -121,13 +121,17 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
             if scaling.bitpix == 8:  # unsigned, says FITS
                 maxValue = bscale*(2**scaling.bitpix) - 1 + bzero
                 minValue = bzero
-            elif scaling.bitpix == 32:
-                # cfitsio adds a padding of 10 integers, and so do we
-                maxValue = bscale*(2**(scaling.bitpix - 1) - 1) + bzero
-                minValue = -bscale*(2**(scaling.bitpix - 1)) + bzero
             else:
                 maxValue = bscale*(2**(scaling.bitpix - 1) - 1) + bzero
-                minValue = -bscale*(2**(scaling.bitpix - 1)) + bzero
+                if scaling.bitpix == 32:
+                    # cfitsio pads 10 values, and so do we
+                    minValue = -bscale*(2**(scaling.bitpix - 1) - 10) + bzero
+                else:
+                    minValue = -bscale*(2**(scaling.bitpix - 1)) + bzero
+
+            # Convert scalars to the appropriate type
+            maxValue = np.array(maxValue, dtype=image.getArray().dtype)
+            minValue = np.array(minValue, dtype=image.getArray().dtype)
 
         return image, unpersisted, bscale, bzero, minValue, maxValue
 
@@ -238,7 +242,6 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         self.checkSpecialPixels(original, unpersisted, maxValue, minValue, atol=atol)
         self.assertImagesAlmostEqual(original, unpersisted, atol=atol)
 
-    @lsst.utils.tests.debugger(Exception)
     def testRange(self):
         """Test that the RANGE scaling works on floating-point inputs
 
