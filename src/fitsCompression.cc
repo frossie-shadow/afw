@@ -193,14 +193,12 @@ ImageScale ImageScalingOptions::determineFromRange(
         if (*ii > max) max = *ii;
         if (*ii < min) min = *ii;
     }
-    std::cerr << "Minmax: " << min << " " << max << std::endl;
     if (min == max) return ImageScale(bitpix, 1.0, min);
     double const bscale = static_cast<T>((max - min)/range);
     double bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
     if (emulateCfitsio) {
         bzero -= 0.5*bscale*N_RESERVED_VALUES;
     }
-//    std::cerr << bscale*0.5*range
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -298,11 +296,6 @@ class CfitsioRandom {
         assert(seed != 0 && seed < N_RANDOM);
         fits_init_randoms();
         resetForTile(0);
-        // std::cerr << "RANDOMS: ";
-        // for (int i = 0; i < N_RANDOM; ++i) {
-        //     std::cerr << fits_rand_value[i] << " ";
-        // }
-        // std::cerr << std::endl;
     }
 
     /// Reset the indices for the i-th tile
@@ -336,15 +329,12 @@ class CfitsioRandom {
         typename ndarray::Array<T const, 2, 2>::Index const& shape,
         ndarray::Array<long, 1> const& tiles
     ) {
-        std::cerr << "Generating randoms... " << _seed << " " << _start << " " << _index << std::endl;
         std::size_t const xSize = shape[1], ySize = shape[0];
         ndarray::Array<T, 1, 1> out = ndarray::allocate(xSize*ySize);
         std::size_t const xTileSize = tiles[0] <= 0 ? xSize : tiles[0];
         std::size_t const yTileSize = tiles[1] < 0 ? ySize : (tiles[1] == 0 ? 1 : tiles[1]);
         int const xNumTiles = std::ceil(xSize/static_cast<float>(xTileSize));
         int const yNumTiles = std::ceil(ySize/static_cast<float>(yTileSize));
-        std::cerr << "Sizes: " << xSize << "," << ySize << " " << xTileSize << "," << yTileSize << std::endl;
-        std::cerr << "Tiles: " << xNumTiles << "," << yNumTiles << std::endl;
         for (int iTile = 0, yTile = 0; yTile < yNumTiles; ++yTile) {
             int const yStart = yTile*yTileSize;
             int const yStop = std::min(yStart + yTileSize, ySize);
@@ -356,12 +346,10 @@ class CfitsioRandom {
                     auto iter = out.begin() + y*xSize + xStart;
                     for (int x = xStart; x < xStop; ++x, ++iter) {
                         *iter = static_cast<T>(getNext());
-                        std::cerr << *iter << " ";
                     }
                 }
             }
         }
-        std::cerr << "Done" << std::endl;
         return out;
     }
 
@@ -439,7 +427,6 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
                               "Tile sizes must be provided if fuzzing is desired");
         }
         out = CfitsioRandom(seed).forImage<double>(image.getShape(), tiles);
-        std::cerr << out << std::endl;
     } else {
         out = ndarray::allocate(num);
     }

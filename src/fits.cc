@@ -994,7 +994,6 @@ void Fits::writeImage(
 
     // Scale the image how we want it on disk
     ndarray::Array<T const, 2, 2> array = makeContiguousArray(image.getArray());
-    std::cerr << "TILES: " << options.compression.tiles << std::endl;
     auto pixels = scale.toFits(array, compression.quantizeLevel != 0, options.scaling.fuzz,
                                options.compression.tiles, options.scaling.seed);
 
@@ -1133,7 +1132,6 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
         return;
     }
 
-    std::cerr << "Setting tile dimensions: " << comp.tiles << std::endl;
     fits_set_tile_dim(fits, comp.tiles.getNumElements(), comp.tiles.getData(), &status);
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Setting tile dimensions");
