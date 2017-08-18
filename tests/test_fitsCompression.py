@@ -121,9 +121,13 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
             if scaling.bitpix == 8:  # unsigned, says FITS
                 maxValue = bscale*(2**scaling.bitpix) - 1 + bzero
                 minValue = bzero
+            elif scaling.bitpix == 32:
+                # cfitsio adds a padding of 10 integers, and so do we
+                maxValue = bscale*(2**(scaling.bitpix - 1) - 1) + bzero
+                minValue = -bscale*(2**(scaling.bitpix - 1)) + bzero
             else:
                 maxValue = bscale*(2**(scaling.bitpix - 1) - 1) + bzero
-                minValue = -bscale*2**(scaling.bitpix - 1) + bzero
+                minValue = -bscale*(2**(scaling.bitpix - 1)) + bzero
 
         return image, unpersisted, bscale, bzero, minValue, maxValue
 
@@ -188,11 +192,14 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         scaling = ImageScalingOptions(ImageScalingOptions.RANGE, bitpix, [u"BAD"], fuzz=False)
         original, unpersisted, bscale, bzero, minValue, maxValue = self.makeImage(ImageClass, scaling, False)
 
-        bscaleExpect = (self.highValue - self.lowValue)/2**bitpix
+        numValues = 2**bitpix
+        if bitpix == 32:
+            numValues -= 10
+        bscaleExpect = (self.highValue - self.lowValue)/numValues
         self.assertFloatsAlmostEqual(bscale, bscaleExpect, rtol=1.0e-6)
 
         rtol = 1.0/2**(bitpix - 1)
-        self.checkSpecialPixels(original, unpersisted, maxValue, minValue, rtol=rtol)
+        self.checkSpecialPixels(original, unpersisted, maxValue, minValue, atol=bscale)
         self.assertImagesAlmostEqual(original, unpersisted, rtol=rtol)
 
     def checkStdev(self, ImageClass, bitpix, scheme):
@@ -231,6 +238,7 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         self.checkSpecialPixels(original, unpersisted, maxValue, minValue, atol=atol)
         self.assertImagesAlmostEqual(original, unpersisted, atol=atol)
 
+    @lsst.utils.tests.debugger(Exception)
     def testRange(self):
         """Test that the RANGE scaling works on floating-point inputs
 
@@ -344,7 +352,8 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
     that will affect the compression ratio (e.g., size, noise properties).
     """
     def setUp(self):
-        self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(78, 90))
+#        self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(78, 90))
+        self.bbox = lsst.afw.geom.Box2I(lsst.afw.geom.Point2I(123, 456), lsst.afw.geom.Extent2I(7, 8))
         self.background = 12345.6789  # Background value
         self.noise = 67.89  # Noise (stdev)
         self.maskPlanes = ["FOO", "BAR"]  # Mask planes to add
@@ -519,7 +528,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             scaling = ImageScalingOptions(ImageScalingOptions.STDEV_BOTH, bitpix, quantizeLevel=quantize,
                                           fuzz=fuzz)
             image = self.makeImage(cls)
-            self.checkCompressedImage(cls, image, compression, scaling, atol=1.2*self.noise/quantize)
+            self.checkCompressedImage(cls, image, compression, scaling, atol=1.5*self.noise/quantize)
 
     def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
         """Read the MaskedImage after it has been written
@@ -613,6 +622,34 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         maskOptions = lsst.afw.fits.ImageWriteOptions(compression)
         self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.2*self.noise/quantize)
 
+    def testQuantization(self):
+        """Test that our quantization produces the same values as cfitsio"""
+        bscaleSet = 1.0
+        bzeroSet = self.background - 10*self.noise
+        scheme = ImageCompressionOptions.GZIP
+        classList = (lsst.afw.image.ImageF, lsst.afw.image.ImageD)
+        tilesList = ((4, 5), (0, 0), (0, 5), (4, 0), (0, 1))
+        for cls, tiles in itertools.product(classList, tilesList):
+            tiles = np.array(tiles, dtype=np.int64)
+            compression = ImageCompressionOptions(scheme, tiles, -bscaleSet)
+            original = self.makeImage(cls)
+            with lsst.utils.tests.getTempFilePath(".fits") as filename:
+                with lsst.afw.fits.Fits(filename, "w") as fits:
+                    options = lsst.afw.fits.ImageWriteOptions(compression)
+                    original.writeFits(fits, options)
+                cfitsio = cls(filename)
+                header = lsst.afw.image.readMetadata(filename, 1)
+                seed = header.get("ZDITHER0")
+                self.assertEqual(header.get("BSCALE"), bscaleSet)
+
+            compression = ImageCompressionOptions(scheme, tiles, 0.0)
+            scaling = ImageScalingOptions(ImageScalingOptions.MANUAL, 32, [u"BAD"], bscale=bscaleSet,
+                                          bzero=bzeroSet, fuzz=True, seed=seed)
+            unpersisted = self.checkCompressedImage(cls, original, compression, scaling, atol=1.2*bscaleSet)
+            oursDiff = unpersisted.getArray() - original.getArray()
+            cfitsioDiff = cfitsio.getArray() - original.getArray()
+            self.assertImagesAlmostEqual(oursDiff, cfitsioDiff, atol=0.0)
+
 
 def optionsToPropertySet(options):
     """Convert the ImageWriteOptions to a PropertySet
@@ -683,6 +720,10 @@ class PersistenceTestCase(ImageCompressionTestCase):
 
     We override the I/O methods to use the persistence framework.
     """
+    def testQuantization(self):
+        """Not appropriate --- disable"""
+        pass
+
     def readWriteImage(self, ImageClass, image, filename, options):
         """Read the image after it has been written
 

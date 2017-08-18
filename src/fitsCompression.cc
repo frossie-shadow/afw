@@ -10,6 +10,9 @@ extern "C" {
 
 #include "lsst/afw/fitsCompression.h"
 
+extern float* fits_rand_value;  // defined in cfitsio
+int const N_RESERVED_VALUES = 10;
+
 namespace lsst {
 namespace afw {
 namespace fits {
@@ -113,6 +116,23 @@ std::string scalingSchemeToString(ImageScalingOptions::ScalingScheme scheme)
 }
 
 
+ImageScalingOptions::ImageScalingOptions(
+    ScalingScheme scheme_,
+    int bitpix_,
+    std::vector<std::string> const& maskPlanes_,
+    int seed_,
+    float quantizeLevel_,
+    float quantizePad_,
+    bool fuzz_,
+    double bscale_,
+    double bzero_
+) : scheme(scheme_), bitpix(bitpix_), fuzz(fuzz_),
+    seed((seed_ - 1) % (N_RANDOM - 1) + 1),  // zero is bad (cfitsio uses non-deterministic method: clock)
+    maskPlanes(maskPlanes_),
+    quantizeLevel(quantizeLevel_), quantizePad(quantizePad_),
+    bscale(bscale_), bzero(bzero_) {}
+
+
 namespace {
 
 template <typename T, int N>
@@ -159,7 +179,11 @@ ImageScale ImageScalingOptions::determineFromRange(
     ndarray::Array<bool, N, N> const& mask,
     bool isUnsigned
 ) const {
-    double const range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
+    double range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
+    bool const emulateCfitsio = !std::numeric_limits<T>::is_integer && bitpix == 32;
+    if (emulateCfitsio) {
+        range -= N_RESERVED_VALUES;
+    }
     T min = std::numeric_limits<T>::max(), max = std::numeric_limits<T>::min();
     auto mm = ndarray::flatten<1>(mask).begin();
     auto const& flatImage = ndarray::flatten<1>(image);
@@ -169,9 +193,14 @@ ImageScale ImageScalingOptions::determineFromRange(
         if (*ii > max) max = *ii;
         if (*ii < min) min = *ii;
     }
+    std::cerr << "Minmax: " << min << " " << max << std::endl;
     if (min == max) return ImageScale(bitpix, 1.0, min);
     double const bscale = static_cast<T>((max - min)/range);
-    double const bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
+    double bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
+    if (emulateCfitsio) {
+        bzero -= 0.5*bscale*N_RESERVED_VALUES;
+    }
+//    std::cerr << bscale*0.5*range
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -190,6 +219,7 @@ ImageScale ImageScalingOptions::determineFromStdev(
         // Put (mean - N sigma) at the lowest possible value: predominantly positive images
         imageVal = median - quantizePad * stdev;
         diskVal = - (1L << (bitpix - 1));
+        if (!std::numeric_limits<T>::is_integer && bitpix == 32) diskVal += N_RESERVED_VALUES;
         break;
       case ImageScalingOptions::STDEV_NEGATIVE:
         // Put (mean + N sigma) at the highest possible value: predominantly negative images
@@ -205,8 +235,10 @@ ImageScale ImageScalingOptions::determineFromStdev(
         std::abort(); // Programming error: should never get here
     }
 
+    /// XXX adjust bzero if the entire range of data can possibly fit
+
     double const bscale = static_cast<T>(stdev/quantizeLevel);
-    double const bzero = static_cast<T>(imageVal - bscale*diskVal);
+    double bzero = static_cast<T>(imageVal - bscale*diskVal);
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -243,6 +275,7 @@ ImageScale ImageScalingOptions::determine(
     switch (scheme) {
       case NONE: return ImageScale(detail::Bitpix<T>::value, 1.0, Bzero<T>::value);
       case RANGE: return determineFromRange(image, mask, bitpix == 8);
+      case MANUAL: return ImageScale(bitpix, bscale, bzero);
       case ImageScalingOptions::STDEV_POSITIVE:
       case ImageScalingOptions::STDEV_NEGATIVE:
       case ImageScalingOptions::STDEV_BOTH:
@@ -252,13 +285,111 @@ ImageScale ImageScalingOptions::determine(
     }
 }
 
+namespace {
+
+/// Random number generator used by cfitsio
+///
+/// We use the exact same random numbers that cfitsio generates, and
+/// copy the implementation for the indexing.
+class CfitsioRandom {
+  public:
+    /// Ctor
+    CfitsioRandom(int seed) : _seed(seed) {
+        assert(seed != 0 && seed < N_RANDOM);
+        fits_init_randoms();
+        resetForTile(0);
+        // std::cerr << "RANDOMS: ";
+        // for (int i = 0; i < N_RANDOM; ++i) {
+        //     std::cerr << fits_rand_value[i] << " ";
+        // }
+        // std::cerr << std::endl;
+    }
+
+    /// Reset the indices for the i-th tile
+    void resetForTile(int iTile) {
+        _start = (iTile + _seed - 1) % N_RANDOM;
+        reseed();
+    }
+
+    /// Get the next value
+    float getNext() {
+        float const value = fits_rand_value[_index];
+        increment();
+        return value;
+    }
+
+    /// Increment the indices
+    void increment() {
+        ++_index;
+        if (_index == N_RANDOM) {
+            ++_start;
+            if (_start == N_RANDOM) {
+                _start = 0;
+            }
+            reseed();
+        }
+    }
+
+    /// Generate a flattened image of random numbers
+    template <typename T>
+    ndarray::Array<T, 1, 1> forImage(
+        typename ndarray::Array<T const, 2, 2>::Index const& shape,
+        ndarray::Array<long, 1> const& tiles
+    ) {
+        std::cerr << "Generating randoms... " << _seed << " " << _start << " " << _index << std::endl;
+        std::size_t const xSize = shape[1], ySize = shape[0];
+        ndarray::Array<T, 1, 1> out = ndarray::allocate(xSize*ySize);
+        std::size_t const xTileSize = tiles[0] <= 0 ? xSize : tiles[0];
+        std::size_t const yTileSize = tiles[1] < 0 ? ySize : (tiles[1] == 0 ? 1 : tiles[1]);
+        int const xNumTiles = std::ceil(xSize/static_cast<float>(xTileSize));
+        int const yNumTiles = std::ceil(ySize/static_cast<float>(yTileSize));
+        std::cerr << "Sizes: " << xSize << "," << ySize << " " << xTileSize << "," << yTileSize << std::endl;
+        std::cerr << "Tiles: " << xNumTiles << "," << yNumTiles << std::endl;
+        for (int iTile = 0, yTile = 0; yTile < yNumTiles; ++yTile) {
+            int const yStart = yTile*yTileSize;
+            int const yStop = std::min(yStart + yTileSize, ySize);
+            for (int xTile = 0; xTile < xNumTiles; ++xTile, ++iTile) {
+                int const xStart = xTile*xTileSize;
+                int const xStop = std::min(xStart + xTileSize, xSize);
+                resetForTile(iTile);
+                for (int y = yStart; y < yStop; ++y) {
+                    auto iter = out.begin() + y*xSize + xStart;
+                    for (int x = xStart; x < xStop; ++x, ++iter) {
+                        *iter = static_cast<T>(getNext());
+                        std::cerr << *iter << " ";
+                    }
+                }
+            }
+        }
+        std::cerr << "Done" << std::endl;
+        return out;
+    }
+
+  private:
+    /// Start the run of indices over with the new seed value
+    void reseed() {
+        _index = static_cast<int>(fits_rand_value[_start]*500);
+    }
+
+    int _seed;   // Initial seed
+    int _start;  // Starting index for tile; "iseed" in cfitsio
+    int _index;  // Index of next value; "nextrand" in cfitsio
+};
+
+double NINT(double const x) {
+    return int(x >= 0.0 ? x + 0.5 : x - 0.5);
+}
+
+} // anonymous namespace
+
 
 template <typename T>
 std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
     ndarray::Array<T const, 2, 2> const& image,
     bool forceNonfiniteRemoval,
     bool fuzz,
-    unsigned long seed
+    ndarray::Array<long, 1> const& tiles,
+    int seed
 ) const {
     if (!std::numeric_limits<T>::is_integer && bitpix < 0) {
         if (bitpix != detail::Bitpix<T>::value) {
@@ -289,15 +420,29 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
         // Fall through for explicit scaling
     }
 
-    math::Random rng(math::Random::MT19937, seed);
-
     // Note: BITPIX=8 treated differently, since it uses unsigned values; the rest use signed */
-    double const min = bitpix == 8 ? 0 : -std::pow(2.0, bitpix - 1);
-    double const max = bitpix == 8 ? 255 : (std::pow(2.0, bitpix - 1) - 1.0);
+    double min = bitpix == 8 ? 0 : -std::pow(2.0, bitpix - 1);
+    double max = bitpix == 8 ? 255 : (std::pow(2.0, bitpix - 1) - 1.0);
+
+    if (!std::numeric_limits<T>::is_integer && bitpix == 32) {
+        // cfitsio saves space for N_RESERVED_VALUES=10 values at the low end
+        min += N_RESERVED_VALUES;
+    }
 
     double const scale = 1.0/bscale;
     std::size_t const num = image.getNumElements();
-    ndarray::Array<double, 1, 1> out = ndarray::allocate(num);
+    bool const applyFuzz = fuzz && !std::numeric_limits<T>::is_integer && bitpix > 0;
+    ndarray::Array<double, 1, 1> out;
+    if (applyFuzz) {
+        if (tiles.isEmpty()) {
+            throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
+                              "Tile sizes must be provided if fuzzing is desired");
+        }
+        out = CfitsioRandom(seed).forImage<double>(image.getShape(), tiles);
+        std::cerr << out << std::endl;
+    } else {
+        out = ndarray::allocate(num);
+    }
     auto outIter = out.begin();
     auto const& flatImage = ndarray::flatten<1>(image);
     for (auto inIter = flatImage.begin(); inIter != flatImage.end(); ++inIter, ++outIter) {
@@ -308,17 +453,13 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
             *outIter = max;
             continue;
         }
-        if (fuzz && std::floor(value) != value) {
+        if (applyFuzz && value - int(value) != 0.0) {
             // Add random factor [0.0,1.0): adds a variance of 1/12,
             // but preserves the expectation value given the floor()
-            value += rng.uniform();
-        }
-        // Check for underflow and overflow; set either to max
-        if (value < min || value > max) {
+            value += *outIter;
         }
         *outIter = (value < min ? min : value > max ? max : std::floor(value));
     }
-
     return detail::makePixelArray(bitpix, out);
 }
 
@@ -336,7 +477,7 @@ ndarray::Array<T, 2, 2> ImageScale::fromFits(ndarray::Array<T, 2, 2> const& imag
     template ImageScale ImageScalingOptions::determine<TYPE, 2>( \
         ndarray::Array<TYPE const, 2, 2> const& image, ndarray::Array<bool, 2, 2> const& mask) const; \
     template std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits<TYPE>( \
-        ndarray::Array<TYPE const, 2, 2> const&, bool, bool, unsigned long) const; \
+        ndarray::Array<TYPE const, 2, 2> const&, bool, bool, ndarray::Array<long, 1> const&, int) const; \
     template ndarray::Array<TYPE, 2, 2> ImageScale::fromFits<TYPE>( \
         ndarray::Array<TYPE, 2, 2> const&) const;
 

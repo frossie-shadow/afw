@@ -255,8 +255,12 @@ struct ImageScale {
     long blank;  ///<  Value for integer images indicating non-finite values
 
     /// Constructor
+    ///
+    /// We make BZERO an integer multiple of BSCALE, because cfitsio notes:
+    /// "This helps to ensure the same scaling will be performed if the 
+    /// file undergoes multiple fpack/funpack cycles".
     ImageScale(int bitpix_, double bscale_, double bzero_) :
-      bitpix(bitpix_), bscale(bscale_), bzero(bzero_),
+      bitpix(bitpix_), bscale(bscale_), bzero(std::floor(bzero_/bscale_ + 0.5)*bscale_),
       blank(bitpix > 0 ? (1L << (bitpix - 1)) - 1 : 0) {}
 
     /// Convert to an array of pixel values to write to FITS
@@ -270,8 +274,9 @@ struct ImageScale {
     std::shared_ptr<detail::PixelArrayBase> toFits(
         ndarray::Array<T const, 2, 2> const& image,
         bool forceNonfiniteRemoval,
-        bool fuzz,
-        unsigned long seed=1
+        bool fuzz=true,
+        ndarray::Array<long, 1> const& tiles=ndarray::Array<long, 1, 1>(),
+        int seed=1
     ) const;
 
     /// Convert to an array
@@ -345,7 +350,7 @@ class ImageScalingOptions {
     ScalingScheme scheme;  ///< Scaling algorithm to use
     int bitpix;  ///< Bits per pixel (0, 8,16,32,64,-32,-64)
     bool fuzz;  ///< Fuzz the values when quantising floating-point values?
-    unsigned long seed;  ///< Seed for random number generator when fuzzing
+    int seed;  ///< Seed for random number generator when fuzzing
     std::vector<std::string> maskPlanes;  ///< Mask planes to ignore when doing statistics
     float quantizeLevel;  ///< Divisor of the standard deviation for STDEV_* scaling
     float quantizePad;  ///< Number of stdev to allow on the low side (for STDEV_POSITIVE/NEGATIVE)
@@ -355,8 +360,8 @@ class ImageScalingOptions {
     ///
     /// Scaling is disabled by default.
     explicit ImageScalingOptions()
-      : scheme(NONE), bitpix(0), fuzz(false), seed(1), quantizeLevel(4.0), quantizePad(5.0),
-        bscale(std::numeric_limits<double>::quiet_NaN()), bzero(std::numeric_limits<double>::quiet_NaN()) {}
+      : ImageScalingOptions(NONE, 0, {}, 1, 4.0, 5.0, false, std::numeric_limits<double>::quiet_NaN(),
+                            std::numeric_limits<double>::quiet_NaN()) {}
 
     /// General purpose Ctor
     ///
@@ -373,14 +378,13 @@ class ImageScalingOptions {
         ScalingScheme scheme_,
         int bitpix_,
         std::vector<std::string> const& maskPlanes_={},
-        unsigned long seed_=1,
+        int seed_=1,
         float quantizeLevel_=4.0,
         float quantizePad_=5.0,
         bool fuzz_=true,
         double bscale_=1.0,
         double bzero_=0.0
-    ) : scheme(scheme_), bitpix(bitpix_), fuzz(fuzz_), seed(seed_), maskPlanes(maskPlanes_),
-        quantizeLevel(quantizeLevel_), quantizePad(quantizePad_), bscale(bscale_), bzero(bzero_) {}
+    );
 
     /// Manual scaling Ctor
     ///
@@ -388,8 +392,7 @@ class ImageScalingOptions {
     /// @param[in] bscale_  Manually specified BSCALE
     /// @param[in] bzero_  Manually specified BZERO
     ImageScalingOptions(int bitpix_, double bscale_=1.0, double bzero_=0.0)
-      : scheme(MANUAL), bitpix(bitpix_), fuzz(false), seed(1), maskPlanes({}),
-        quantizeLevel(4.0), quantizePad(5.0), bscale(bscale_), bzero(bzero_) {}
+      : ImageScalingOptions(MANUAL, bitpix_, {}, 1, 4.0, 5.0, false, bscale_, bzero_) {}
 
     ///{
     /// Determine the scaling for a particular image

@@ -994,8 +994,9 @@ void Fits::writeImage(
 
     // Scale the image how we want it on disk
     ndarray::Array<T const, 2, 2> array = makeContiguousArray(image.getArray());
-    auto pixels = scale.toFits(array, compression.quantizeLevel != 0,
-                               options.scaling.fuzz, options.scaling.seed);
+    std::cerr << "TILES: " << options.compression.tiles << std::endl;
+    auto pixels = scale.toFits(array, compression.quantizeLevel != 0, options.scaling.fuzz,
+                               options.compression.tiles, options.scaling.seed);
 
     // We only want cfitsio to do the scale and zero for unsigned 64-bit integer types. For those,
     // "double bzero" has sufficient precision to represent the appropriate value. We'll let
@@ -1044,6 +1045,12 @@ void Fits::writeImage(
             fits_write_key_lng(fits, "BLANK", scale.blank, "Value for undefined pixels", &status);
         } else {
             fits_write_key_lng(fits, "ZBLANK", scale.blank, "Value for undefined pixels", &status);
+        }
+        if (!std::numeric_limits<T>::is_integer) {
+            fits_write_key_lng(fits, "ZDITHER0", options.scaling.seed, "Dithering seed", &status);
+        // XXXXXX
+//            fits_write_key_str(fits, "ZQUANTIZ", "SUBTRACTIVE_DITHER_2", "Dithering algorithm", &status);
+            fits_write_key_str(fits, "ZQUANTIZ", "SUBTRACTIVE_DITHER_1", "Dithering algorithm", &status);
         }
         if (behavior & AUTO_CHECK) {
             LSST_FITS_CHECK_STATUS(*this, "Writing [Z]BLANK");
@@ -1126,6 +1133,7 @@ void Fits::setImageCompression(ImageCompressionOptions const& comp)
         return;
     }
 
+    std::cerr << "Setting tile dimensions: " << comp.tiles << std::endl;
     fits_set_tile_dim(fits, comp.tiles.getNumElements(), comp.tiles.getData(), &status);
     if (behavior & AUTO_CHECK) {
         LSST_FITS_CHECK_STATUS(*this, "Setting tile dimensions");
