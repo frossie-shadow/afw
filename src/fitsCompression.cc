@@ -171,19 +171,11 @@ std::pair<T, T> calculateMedianStdev(
     return std::make_pair(median, 0.741*(uq - lq));
 }
 
-} // anonymous namespace
-
 template <typename T, int N>
-ImageScale ImageScalingOptions::determineFromRange(
+std::pair<T, T> calculateMinMax(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool, N, N> const& mask,
-    bool isUnsigned
-) const {
-    double range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
-    bool const emulateCfitsio = !std::numeric_limits<T>::is_integer && bitpix == 32;
-    if (emulateCfitsio) {
-        range -= N_RESERVED_VALUES;
-    }
+    ndarray::Array<bool, N, N> const& mask
+) {
     T min = std::numeric_limits<T>::max(), max = std::numeric_limits<T>::min();
     auto mm = ndarray::flatten<1>(mask).begin();
     auto const& flatImage = ndarray::flatten<1>(image);
@@ -193,10 +185,39 @@ ImageScale ImageScalingOptions::determineFromRange(
         if (*ii > max) max = *ii;
         if (*ii < min) min = *ii;
     }
+    return std::make_pair(min, max);
+}
+
+// Return range of values for target BITPIX
+template <typename T>
+double rangeForBitpix(int bitpix, bool cfitsioPadding) {
+    if (bitpix == 0) {
+        bitpix = detail::Bitpix<T>::value;
+    }
+    double range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
+    if (cfitsioPadding) {
+        range -= N_RESERVED_VALUES;
+    }
+    return range;
+}
+
+} // anonymous namespace
+
+template <typename T, int N>
+ImageScale ImageScalingOptions::determineFromRange(
+    ndarray::Array<T const, N, N> const& image,
+    ndarray::Array<bool, N, N> const& mask,
+    bool isUnsigned,
+    bool cfitsioPadding
+) const {
+    auto minMax = calculateMinMax(image, mask);
+    T const min = minMax.first;
+    T const max = minMax.second;
     if (min == max) return ImageScale(bitpix, 1.0, min);
+    double const range = rangeForBitpix<T>(bitpix, cfitsioPadding);
     double const bscale = static_cast<T>((max - min)/range);
     double bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
-    if (emulateCfitsio) {
+    if (cfitsioPadding) {
         bzero -= 0.5*bscale*N_RESERVED_VALUES;
     }
     return ImageScale(bitpix, bscale, bzero);
@@ -205,39 +226,50 @@ ImageScale ImageScalingOptions::determineFromRange(
 template <typename T, int N>
 ImageScale ImageScalingOptions::determineFromStdev(
     ndarray::Array<T const, N, N> const& image,
-    ndarray::Array<bool, N, N> const& mask
+    ndarray::Array<bool, N, N> const& mask,
+    bool isUnsigned,
+    bool cfitsioPadding
 ) const {
     auto stats = calculateMedianStdev(image, mask);
     auto const median = stats.first, stdev = stats.second;
-    std::cerr << "Median: " << median << " Stdev: " << stdev << std::endl;
+    double const bscale = static_cast<T>(stdev/quantizeLevel);
+
+    /// Use min/max-based bzero if we can possibly fit everything in
+    auto minMax = calculateMinMax(image, mask);
+    T const min = minMax.first;
+    T const max = minMax.second;
+    double range = rangeForBitpix<T>(bitpix, cfitsioPadding);  // Range of values for target BITPIX
+    double const numUnique = (max - min)/bscale;  // Number of unique values
 
     double imageVal;                    // Value on image
     long diskVal;                       // Corresponding quantized value
-    switch (scheme) {
-      case ImageScalingOptions::STDEV_POSITIVE:
-        // Put (mean - N sigma) at the lowest possible value: predominantly positive images
-        imageVal = median - quantizePad * stdev;
-        diskVal = - (1L << (bitpix - 1));
-        if (!std::numeric_limits<T>::is_integer && bitpix == 32) diskVal += N_RESERVED_VALUES;
-        break;
-      case ImageScalingOptions::STDEV_NEGATIVE:
-        // Put (mean + N sigma) at the highest possible value: predominantly negative images
-        imageVal = median + quantizePad * stdev;
-        diskVal = (1L << (bitpix - 1)) - 1;
-        break;
-      case ImageScalingOptions::STDEV_BOTH:
-        // Put mean right in the middle: images with an equal abundance of positive and negative values
+    if (numUnique < range) {
         imageVal = median;
-        diskVal = 0;
-        break;
-      default:
-        std::abort(); // Programming error: should never get here
+        diskVal = cfitsioPadding ? 0.5*N_RESERVED_VALUES : 0;
+    } else {
+        switch (scheme) {
+          case ImageScalingOptions::STDEV_POSITIVE:
+            // Put (mean - N sigma) at the lowest possible value: predominantly positive images
+            imageVal = median - quantizePad * stdev;
+            diskVal = - (1L << (bitpix - 1));
+            if (cfitsioPadding) diskVal -= N_RESERVED_VALUES;
+            break;
+          case ImageScalingOptions::STDEV_NEGATIVE:
+            // Put (mean + N sigma) at the highest possible value: predominantly negative images
+            imageVal = median + quantizePad * stdev;
+            diskVal = (1L << (bitpix - 1)) - 1;
+            break;
+          case ImageScalingOptions::STDEV_BOTH:
+            // Put mean right in the middle: images with an equal abundance of positive and negative values
+            imageVal = median;
+            diskVal = cfitsioPadding ? 0.5*N_RESERVED_VALUES : 0;
+            break;
+          default:
+            std::abort(); // Programming error: should never get here
+        }
     }
 
-    /// XXX adjust bzero if the entire range of data can possibly fit
-
-    double const bscale = static_cast<T>(stdev/quantizeLevel);
-    double const bzero = static_cast<T>(imageVal - bscale*diskVal);
+    double bzero = static_cast<T>(imageVal - bscale*diskVal);
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -271,14 +303,16 @@ ImageScale ImageScalingOptions::determine(
         throw LSST_EXCEPT(pex::exceptions::InvalidParameterError,
                           "Image scaling not supported for integral types");
     }
+    bool const isUnsigned = bitpix == 8 || (bitpix == 0 && detail::Bitpix<T>::value == 8);
+    bool const cfitsioPadding = !std::numeric_limits<T>::is_integer && bitpix == 32;
     switch (scheme) {
       case NONE: return ImageScale(detail::Bitpix<T>::value, 1.0, Bzero<T>::value);
-      case RANGE: return determineFromRange(image, mask, bitpix == 8);
+      case RANGE: return determineFromRange(image, mask, isUnsigned, cfitsioPadding);
       case MANUAL: return ImageScale(bitpix, bscale, bzero);
       case ImageScalingOptions::STDEV_POSITIVE:
       case ImageScalingOptions::STDEV_NEGATIVE:
       case ImageScalingOptions::STDEV_BOTH:
-        return determineFromStdev(image, mask);
+        return determineFromStdev(image, mask, isUnsigned, cfitsioPadding);
       default:
         std::abort();  // should never get here
     }
@@ -365,10 +399,6 @@ class CfitsioRandom {
     int _index;  // Index of next value; "nextrand" in cfitsio
 };
 
-double NINT(double const x) {
-    return int(x >= 0.0 ? x + 0.5 : x - 0.5);
-}
-
 } // anonymous namespace
 
 
@@ -390,8 +420,6 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
                               "Scaling may not be applied to floating-point images");
         }
     }
-
-    std::cerr << "Applying BSCALE " << bscale << " and BZERO " << bzero << std::endl;
 
     if (bitpix < 0 || (bitpix == 0 && !std::numeric_limits<T>::is_integer) ||
         (bscale == 1.0 && bzero == 0.0 && !fuzz)) {

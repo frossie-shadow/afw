@@ -448,21 +448,27 @@ class ImageScalingOptions {
     /// @param[in] image  Image for which to determine scaling
     /// @param[in] mask  Mask for image (used to measuring statistics)
     /// @param[in] isUnsigned  Is the output using an unsigned integer?
+    /// @param[in] cfitsioPadding  Pad the low end like cfitsio does (for BITPIX=32)?
     template <typename T, int N>
     ImageScale determineFromRange(
         ndarray::Array<T const, N, N> const& image,
         ndarray::Array<bool, N, N> const& mask,
-        bool isUnsigned=false
+        bool isUnsigned=false,
+        bool cfitsioPadding=true
     ) const;
 
     /// Determine scale using the STDEV algorithm
     ///
     /// @param[in] image  Image for which to determine scaling
     /// @param[in] mask  Mask for image (used to measuring statistics)
+    /// @param[in] isUnsigned  Is the output using an unsigned integer?
+    /// @param[in] cfitsioPadding  Pad the low end like cfitsio does (for BITPIX=32)?
     template <typename T, int N>
     ImageScale determineFromStdev(
         ndarray::Array<T const, N, N> const& image,
-        ndarray::Array<bool, N, N> const& mask
+        ndarray::Array<bool, N, N> const& mask,
+        bool isUnsigned=false,
+        bool cfitsioPadding=true
     ) const;
 
 };
