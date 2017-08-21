@@ -134,6 +134,7 @@ void defineImageScale(py::module & mod) {
     cls.def_readonly("bitpix", &ImageScale::bitpix);
     cls.def_readonly("bscale", &ImageScale::bscale);
     cls.def_readonly("bzero", &ImageScale::bzero);
+    cls.def_readonly("blank", &ImageScale::blank);
 
     defineImageScaleTemplates<float>(cls, "F");
     defineImageScaleTemplates<double>(cls, "D");

@@ -209,6 +209,7 @@ ImageScale ImageScalingOptions::determineFromStdev(
 ) const {
     auto stats = calculateMedianStdev(image, mask);
     auto const median = stats.first, stdev = stats.second;
+    std::cerr << "Median: " << median << " Stdev: " << stdev << std::endl;
 
     double imageVal;                    // Value on image
     long diskVal;                       // Corresponding quantized value
@@ -236,7 +237,7 @@ ImageScale ImageScalingOptions::determineFromStdev(
     /// XXX adjust bzero if the entire range of data can possibly fit
 
     double const bscale = static_cast<T>(stdev/quantizeLevel);
-    double bzero = static_cast<T>(imageVal - bscale*diskVal);
+    double const bzero = static_cast<T>(imageVal - bscale*diskVal);
     return ImageScale(bitpix, bscale, bzero);
 }
 
@@ -390,6 +391,8 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
         }
     }
 
+    std::cerr << "Applying BSCALE " << bscale << " and BZERO " << bzero << std::endl;
+
     if (bitpix < 0 || (bitpix == 0 && !std::numeric_limits<T>::is_integer) ||
         (bscale == 1.0 && bzero == 0.0 && !fuzz)) {
         if (!forceNonfiniteRemoval) {
@@ -437,7 +440,7 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
         if (!std::isfinite(value)) {
             // This choice of "max" for non-finite and overflow pixels is mainly cosmetic --- it has to be
             // something, and "min" would produce holes in the cores of bright stars.
-            *outIter = max;
+            *outIter = blank;
             continue;
         }
         if (applyFuzz && value - int(value) != 0.0) {
@@ -445,7 +448,7 @@ std::shared_ptr<detail::PixelArrayBase> ImageScale::toFits(
             // but preserves the expectation value given the floor()
             value += *outIter;
         }
-        *outIter = (value < min ? min : value > max ? max : std::floor(value));
+        *outIter = (value < min ? blank : value > max ? blank : std::floor(value));
     }
     return detail::makePixelArray(bitpix, out);
 }

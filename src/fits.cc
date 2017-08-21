@@ -1040,15 +1040,13 @@ void Fits::writeImage(
     }
 
     if (scale.bitpix > 0) {
-        if (compression.scheme == ImageCompressionOptions::NONE) {
+//        if (compression.scheme == ImageCompressionOptions::NONE) {
             fits_write_key_lng(fits, "BLANK", scale.blank, "Value for undefined pixels", &status);
-        } else {
+//        } else {
             fits_write_key_lng(fits, "ZBLANK", scale.blank, "Value for undefined pixels", &status);
-        }
+//        }
         if (!std::numeric_limits<T>::is_integer) {
             fits_write_key_lng(fits, "ZDITHER0", options.scaling.seed, "Dithering seed", &status);
-        // XXXXXX
-//            fits_write_key_str(fits, "ZQUANTIZ", "SUBTRACTIVE_DITHER_2", "Dithering algorithm", &status);
             fits_write_key_str(fits, "ZQUANTIZ", "SUBTRACTIVE_DITHER_1", "Dithering algorithm", &status);
         }
         if (behavior & AUTO_CHECK) {
