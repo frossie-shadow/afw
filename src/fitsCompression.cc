@@ -194,7 +194,7 @@ double rangeForBitpix(int bitpix, bool cfitsioPadding) {
     if (bitpix == 0) {
         bitpix = detail::Bitpix<T>::value;
     }
-    double range = std::pow(2.0, bitpix);  // Range of values for target BITPIX
+    double range = std::pow(2.0, bitpix) - 1;  // Range of values for target BITPIX
     if (cfitsioPadding) {
         range -= N_RESERVED_VALUES;
     }
@@ -214,12 +214,14 @@ ImageScale ImageScalingOptions::determineFromRange(
     T const min = minMax.first;
     T const max = minMax.second;
     if (min == max) return ImageScale(bitpix, 1.0, min);
-    double const range = rangeForBitpix<T>(bitpix, cfitsioPadding);
+    double range = rangeForBitpix<T>(bitpix, cfitsioPadding);
+    range -= 2;  // To allow for rounding and fuzz at either end
     double const bscale = static_cast<T>((max - min)/range);
     double bzero = static_cast<T>(isUnsigned ? min : min + 0.5*range*bscale);
     if (cfitsioPadding) {
-        bzero -= 0.5*bscale*N_RESERVED_VALUES;
+        bzero -= bscale*N_RESERVED_VALUES;
     }
+    bzero -= bscale;  // Allow for rounding and fuzz on the low end
     return ImageScale(bitpix, bscale, bzero);
 }
 

@@ -196,7 +196,8 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         scaling = ImageScalingOptions(ImageScalingOptions.RANGE, bitpix, [u"BAD"], fuzz=False)
         original, unpersisted, bscale, bzero, minValue, maxValue = self.makeImage(ImageClass, scaling, False)
 
-        numValues = 2**bitpix
+        numValues = 2**bitpix - 1
+        numValues -= 2  # Padding on either end
         if bitpix == 32:
             numValues -= 10
         bscaleExpect = (self.highValue - self.lowValue)/numValues
@@ -227,20 +228,8 @@ class ImageScalingTestCase(lsst.utils.tests.TestCase):
         original, unpersisted, bscale, bzero, minValue, maxValue = makeImageResults
 
         self.assertFloatsAlmostEqual(bscale, self.stdev/quantizeLevel, rtol=3.0/quantizeLevel)
-
-        # Testing bzero gives us the desired distribution
-        if scheme == ImageScalingOptions.STDEV_POSITIVE:
-            self.assertGreater(maxValue - self.base, self.base - minValue)
-        elif scheme == ImageScalingOptions.STDEV_NEGATIVE:
-            self.assertLess(maxValue - self.base, self.base - minValue)
-        elif scheme == ImageScalingOptions.STDEV_BOTH:
-            self.assertFloatsAlmostEqual(maxValue - self.base - 1, self.base - minValue, atol=1.0)
-        else:
-            raise RuntimeError("Unrecognised scheme: %d" % scheme)
-
-        atol = 1.001*bscale
-        self.checkSpecialPixels(original, unpersisted, maxValue, minValue, atol=atol)
-        self.assertImagesAlmostEqual(original, unpersisted, atol=atol)
+        self.checkSpecialPixels(original, unpersisted, maxValue, minValue, atol=bscale)
+        self.assertImagesAlmostEqual(original, unpersisted, atol=bscale)
 
     def testRange(self):
         """Test that the RANGE scaling works on floating-point inputs

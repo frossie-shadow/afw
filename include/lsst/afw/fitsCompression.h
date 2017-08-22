@@ -261,7 +261,7 @@ struct ImageScale {
     /// file undergoes multiple fpack/funpack cycles".
     ImageScale(int bitpix_, double bscale_, double bzero_) :
       bitpix(bitpix_), bscale(bscale_), bzero(std::floor(bzero_/bscale_ + 0.5)*bscale_),
-      blank(bitpix > 0 ? (1L << (bitpix - 1)) - 1 : 0) {}
+      blank(bitpix > 0 ? (bitpix == 8 ? 255 : (1L << (bitpix - 1)) - 1) : 0) {}
 
     /// Convert to an array of pixel values to write to FITS
     ///
