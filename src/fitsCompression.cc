@@ -10,8 +10,8 @@ extern "C" {
 
 #include "lsst/afw/fitsCompression.h"
 
-extern float* fits_rand_value;  // defined in cfitsio
-int const N_RESERVED_VALUES = 10;
+extern float* fits_rand_value;  // Random numbers, defined in cfitsio
+int const N_RESERVED_VALUES = 10;  // Number of reserved values for float --> bitpix=32 conversions (cfitsio)
 
 namespace lsst {
 namespace afw {
@@ -135,6 +135,7 @@ ImageScalingOptions::ImageScalingOptions(
 
 namespace {
 
+/// Calculate median and standard deviation for an image
 template <typename T, int N>
 std::pair<T, T> calculateMedianStdev(
     ndarray::Array<T const, N, N> const& image,
@@ -171,6 +172,7 @@ std::pair<T, T> calculateMedianStdev(
     return std::make_pair(median, 0.741*(uq - lq));
 }
 
+/// Calculate min and max for an image
 template <typename T, int N>
 std::pair<T, T> calculateMinMax(
     ndarray::Array<T const, N, N> const& image,
@@ -275,6 +277,7 @@ ImageScale ImageScalingOptions::determineFromStdev(
     return ImageScale(bitpix, bscale, bzero);
 }
 
+/// Scaling zero-point, set according to pixel type
 template <typename T, class Enable=void>
 struct Bzero {
     static double constexpr value = 0.0;

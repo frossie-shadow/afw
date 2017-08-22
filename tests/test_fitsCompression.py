@@ -500,7 +500,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
                                                   quantizeLevel=quantizeLevel)
             image = self.makeImage(cls)
-            self.checkCompressedImage(cls, image, compression, atol=1.25*self.noise/quantizeLevel)
+            self.checkCompressedImage(cls, image, compression, atol=self.noise/quantizeLevel)
 
     def testLossyFloatOurs(self):
         """Test lossy compression of floating-point images ourselves
@@ -513,14 +513,14 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
         bitpixList = (16, 32)
         quantizeList = (4.0, 10.0)
-        for cls, scheme, bitpix, quantize, fuzz in itertools.product(classList, schemeList, bitpixList,
-                                                                     quantizeList, [False, True]):
+        for cls, scheme, bitpix, quantize in itertools.product(classList, schemeList, bitpixList,
+                                                               quantizeList):
             compression = ImageCompressionOptions(lsst.afw.fits.compressionSchemeFromString(scheme),
                                                   quantizeLevel=0.0)
             scaling = ImageScalingOptions(ImageScalingOptions.STDEV_BOTH, bitpix, quantizeLevel=quantize,
-                                          fuzz=fuzz)
+                                          fuzz=True)
             image = self.makeImage(cls)
-            self.checkCompressedImage(cls, image, compression, scaling, atol=1.5*self.noise/quantize)
+            self.checkCompressedImage(cls, image, compression, scaling, atol=self.noise/quantize)
 
     def readWriteMaskedImage(self, image, filename, imageOptions, maskOptions, varianceOptions):
         """Read the MaskedImage after it has been written
@@ -603,7 +603,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
         cfitsio = lsst.afw.fits.ImageCompressionOptions(ImageCompressionOptions.GZIP_SHUFFLE, True, quantize)
         imageOptions = lsst.afw.fits.ImageWriteOptions(cfitsio)
         maskOptions = lsst.afw.fits.ImageWriteOptions(lossless)
-        self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.25*self.noise/quantize)
+        self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=self.noise/quantize)
 
         # Lossy our compression
         quantize = 10.0
@@ -612,10 +612,17 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
                                                     quantizeLevel=quantize)
         imageOptions = lsst.afw.fits.ImageWriteOptions(compression, scaling)
         maskOptions = lsst.afw.fits.ImageWriteOptions(compression)
-        self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=1.2*self.noise/quantize)
+        self.checkMaskedImage(imageOptions, maskOptions, imageOptions, atol=self.noise/quantize)
 
     def testQuantization(self):
-        """Test that our quantization produces the same values as cfitsio"""
+        """Test that our quantization produces the same values as cfitsio
+
+        Our quantization is more configurable (e.g., choice of scaling scheme,
+        specifying mask planes) and extensible (logarithmic, asinh scalings)
+        than cfitsio's. However, cfitsio uses its own fuzz ("subtractive dithering")
+        when reading the data, so if we don't want to add random values twice,
+        we need to be sure that we're using the same random values.
+        """
         bscaleSet = 1.0
         bzeroSet = self.background - 10*self.noise
         scheme = ImageCompressionOptions.GZIP
@@ -637,7 +644,7 @@ class ImageCompressionTestCase(lsst.utils.tests.TestCase):
             compression = ImageCompressionOptions(scheme, tiles, 0.0)
             scaling = ImageScalingOptions(ImageScalingOptions.MANUAL, 32, [u"BAD"], bscale=bscaleSet,
                                           bzero=bzeroSet, fuzz=True, seed=seed)
-            unpersisted = self.checkCompressedImage(cls, original, compression, scaling, atol=1.2*bscaleSet)
+            unpersisted = self.checkCompressedImage(cls, original, compression, scaling, atol=bscaleSet)
             oursDiff = unpersisted.getArray() - original.getArray()
             cfitsioDiff = cfitsio.getArray() - original.getArray()
             self.assertImagesAlmostEqual(oursDiff, cfitsioDiff, atol=0.0)
@@ -762,8 +769,8 @@ class EmptyExposureTestCase(lsst.utils.tests.TestCase):
     """Test that an empty image can be written
 
     We sometimes use an empty lsst.afw.image.Exposure as a vehicle for
-    persisting other things, e.g., Wcs. cfitsio compression will choke
-    on an empty image, so make sure we're dealing with that.
+    persisting other things, e.g., Wcs, Calib. cfitsio compression will
+    choke on an empty image, so make sure we're dealing with that.
     """
     def checkEmptyExposure(self, scheme):
         """Check that we can persist an empty Exposure
@@ -788,6 +795,7 @@ class EmptyExposureTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(unpersisted.getWcs(), exp.getWcs())
 
     def testEmptyExposure(self):
+        """Persist an empty Exposure with compression"""
         schemeList = ("GZIP", "GZIP_SHUFFLE", "RICE")
         for scheme in schemeList:
             self.checkEmptyExposure(lsst.afw.fits.compressionSchemeFromString(scheme))

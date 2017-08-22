@@ -267,6 +267,8 @@ struct ImageScale {
     ///
     /// @param[in] image  Image to scale
     /// @param[in] forceNonfiniteRemoval  Force removal of non-finite values?
+    ///     This is useful for lossless compression, because cfitsio doesn't mask out
+    ///     non-finite values, and they end up contaminating the entire tile.
     /// @param[in] fuzz  Add random values before quantising?
     /// @param[in] seed  Seed for random number generator
     /// @return Array of pixel values, appropriately scaled.
@@ -282,7 +284,8 @@ struct ImageScale {
     /// Convert to an array
     ///
     /// Use of this method is generally not necessary, since cfitsio automatically
-    /// applies the scaling on read.
+    /// applies the scaling on read. However, it may be useful for applying novel
+    /// scalings (e.g., logarithmic).
     template <typename T>
     ndarray::Array<T, 2, 2> fromFits(ndarray::Array<T, 2, 2> const& image) const;
 };
